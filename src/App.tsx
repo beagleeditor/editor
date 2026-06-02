@@ -3,7 +3,7 @@ import Editor from "@monaco-editor/react";
 
 import { listen } from "@tauri-apps/api/event";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { readTextFile, writeTextFile, readDir } from "@tauri-apps/plugin-fs";
+import { fsAPI } from "./lib/fs";
 import { homeDir } from "@tauri-apps/api/path";
 
 import ActivityBar from "./components/ActivityBar";
@@ -13,6 +13,91 @@ import StatusBar from "./components/StatusBar";
 import WelcomeScreen from "./components/WelcomeScreen";
 
 import "./App.css";
+import SearchView from "./components/SearchView";
+import { searchAPI } from "./lib/search";
+
+function detectLanguage(filename: string): string {
+  const ext = filename.split(".").pop()?.toLowerCase();
+
+  switch (ext) {
+    case "rs":
+      return "rust";
+
+    case "py":
+      return "python";
+
+    case "js":
+      return "javascript";
+
+    case "ts":
+      return "typescript";
+
+    case "jsx":
+      return "javascript";
+
+    case "tsx":
+      return "typescript";
+
+    case "html":
+      return "html";
+
+    case "css":
+      return "css";
+
+    case "json":
+      return "json";
+
+    case "md":
+      return "markdown";
+
+    case "c":
+      return "c";
+
+    case "cpp":
+    case "cc":
+    case "cxx":
+      return "cpp";
+
+    case "java":
+      return "java";
+
+    case "go":
+      return "go";
+
+    case "php":
+      return "php";
+
+    case "rb":
+      return "ruby";
+
+    case "sh":
+      return "shell";
+
+    case "yaml":
+    case "yml":
+      return "yaml";
+
+    case "toml":
+      return "toml";
+
+    default:
+      return "plaintext";
+  }
+}
+
+function flattenTree(node: FileNode): FileNode[] {
+  const result: FileNode[] = [node];
+
+  const children = (node as any).children;
+
+  if (children) {
+    for (const child of children) {
+      result.push(...flattenTree(child));
+    }
+  }
+
+  return result;
+}
 
 /* -------------------------------------------------------
    TYPES
@@ -33,6 +118,7 @@ type Tab = {
   path: string | null;
   name: string;
   content: string;
+  language: string;
   dirty: boolean;
 };
 
@@ -53,10 +139,6 @@ export default function App() {
 
   const [workspaceDir, setWorkspaceDir] = useState<string | null>(null);
   const [fileTree, setFileTree] = useState<FileNode | null>(null);
-
-  /* ---------------- EDITOR ---------------- */
-
-  const editorRef = useRef<any>(null);
 
   /* ---------------- TABS ---------------- */
 
@@ -79,6 +161,7 @@ export default function App() {
         path: null,
         name: "Untitled",
         content: "",
+        language: "plaintext",
         dirty: false,
       },
     ]);
@@ -99,7 +182,7 @@ export default function App() {
 
     if (!selected || Array.isArray(selected)) return;
 
-    const text = await readTextFile(selected);
+    const text = await fsAPI.readFile(selected);
     const name = selected.split(/[/\\]/).pop() ?? "file";
 
     const id = crypto.randomUUID();
@@ -111,6 +194,7 @@ export default function App() {
         path: selected,
         name,
         content: text,
+        language: detectLanguage(name),
         dirty: false,
       },
     ]);
@@ -137,7 +221,7 @@ export default function App() {
       if (!path) return;
     }
 
-    await writeTextFile(path, activeTab.content);
+    await fsAPI.writeFile(path, activeTab.content);
 
     setTabs((prev) =>
       prev.map((t) =>
@@ -162,7 +246,7 @@ export default function App() {
     setShowWelcome(false);
 
     // 🔥 IMPORTANT: build ROOT node properly
-    const entries = await readDir(dir);
+    const entries = await fsAPI.readDir(dir);
 
     const tree: FileNode = {
       name: dir.split(/[/\\]/).pop() ?? "root",
@@ -183,18 +267,38 @@ export default function App() {
      OPEN FROM EXPLORER
   ------------------------------------------------------- */
 
-  const openFileFromExplorer = async (path: string) => {
-    const text = await readTextFile(path);
+  const openFileFromExplorer = async (path: string, line?: number) => {
+    const text = await fsAPI.readFile(path);
     const name = path.split(/[/\\]/).pop() ?? "file";
 
     const id = crypto.randomUUID();
 
     setTabs((prev) => [
       ...prev,
-      { id, path, name, content: text, dirty: false },
+      {
+        id,
+        path,
+        name,
+        content: text,
+        language: detectLanguage(name),
+        dirty: false,
+      },
     ]);
 
     setActiveTabId(id);
+
+    // wait for editor to mount + render tab
+    setTimeout(() => {
+      if (!editorRef.current || !line) return;
+
+      editorRef.current.revealLineInCenter(line);
+      editorRef.current.setPosition({
+        lineNumber: line,
+        column: 1,
+      });
+
+      editorRef.current.focus();
+    }, 50);
   };
 
   /* -------------------------------------------------------
@@ -211,6 +315,55 @@ export default function App() {
     );
   };
 
+  const changeLanguage = (lang: string) => {
+    if (!activeTab) return;
+
+    setTabs((prev) =>
+      prev.map((t) => (t.id === activeTab.id ? { ...t, language: lang } : t)),
+    );
+  };
+
+  /* -------------------------------------------------------
+     MENU BUTTONS
+------------------------------------------------------- */
+  useEffect(() => {
+    let unlistenOpen: (() => void) | undefined;
+    let unlistenSave: (() => void) | undefined;
+
+    (async () => {
+      unlistenOpen = await listen("menu-open", () => {
+        openFile();
+      });
+
+      unlistenSave = await listen("menu-save", () => {
+        saveFile();
+      });
+    })();
+
+    return () => {
+      unlistenOpen?.();
+      unlistenSave?.();
+    };
+  }, [openFile, saveFile]);
+
+  const searchableFiles = fileTree ? flattenTree(fileTree) : [];
+
+  const openQuickOpen = async (query: string) => {
+    const files = await searchAPI.listFiles(workspaceDir!);
+
+    return files
+      .filter((f) => f.name.toLowerCase().includes(query.toLowerCase()))
+      .slice(0, 50);
+  };
+
+  const search = (q: string) => {
+    if (!workspaceDir) return Promise.resolve([]);
+
+    return searchAPI.searchWorkspace(workspaceDir, q);
+  };
+
+  const editorRef = useRef<any>(null);
+
   /* -------------------------------------------------------
      RENDER
 ------------------------------------------------------- */
@@ -220,8 +373,26 @@ export default function App() {
       <div className="workspace">
         <ActivityBar active={sidebarView} onSelect={setSidebarView} />
 
-        {sidebarVisible && sidebarView === "files" && (
-          <Explorer tree={fileTree} onOpenFile={openFileFromExplorer} />
+        {sidebarVisible && (
+          <aside className="sidebar">
+            {sidebarView === "files" && (
+              <Explorer tree={fileTree} onOpenFile={openFileFromExplorer} />
+            )}
+
+            {sidebarView === "search" && (
+              <SearchView
+                root={workspaceDir}
+                search={search}
+                onOpenFile={openFileFromExplorer}
+              />
+            )}
+
+            {sidebarView === "git" && <div className="sidebar-panel">Git</div>}
+
+            {sidebarView === "settings" && (
+              <div className="sidebar-panel">Settings</div>
+            )}
+          </aside>
         )}
 
         <main className="main">
@@ -230,10 +401,20 @@ export default function App() {
             activeTabId={activeTabId}
             onSelect={setActiveTabId}
             onNewTab={newFile}
-            onClose={(id) => setTabs((prev) => prev.filter((t) => t.id !== id))}
+            onClose={(id) => {
+              setTabs((prev) => {
+                const remaining = prev.filter((t) => t.id !== id);
+
+                if (activeTabId === id) {
+                  setActiveTabId(remaining[0]?.id ?? null);
+                }
+
+                return remaining;
+              });
+            }}
           />
 
-          {showWelcome ? (
+          {showWelcome || tabs.length === 0 ? (
             <WelcomeScreen
               onOpen={openFile}
               onNewFile={newFile}
@@ -241,9 +422,12 @@ export default function App() {
             />
           ) : (
             <Editor
-              language="plaintext"
+              language={activeTab?.language ?? "plaintext"}
               value={activeTab?.content ?? ""}
               onChange={updateContent}
+              onMount={(editor) => {
+                editorRef.current = editor;
+              }}
               theme={theme === "dark" ? "vs-dark" : "vs"}
               options={{
                 automaticLayout: true,
@@ -255,7 +439,12 @@ export default function App() {
         </main>
       </div>
 
-      <StatusBar language="Plain Text" />
+      <StatusBar
+        language={activeTab?.language ?? "plaintext"}
+        lineEnding="LF"
+        encoding="UTF-8"
+        onLanguageChange={changeLanguage}
+      />
     </div>
   );
 }

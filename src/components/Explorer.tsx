@@ -105,6 +105,7 @@ function TreeNode({
   ----------------------------------------------------- */
 
   const handleClick = async () => {
+    console.log(node);
     // FILE → open editor
     if (!isDir) {
       onOpenFile(node.path);
@@ -182,7 +183,7 @@ function TreeNode({
             node={child}
             depth={depth + 1}
             onOpenFile={onOpenFile}
-            defaultOpen={true}
+            defaultOpen={false}
           />
         ))}
     </div>

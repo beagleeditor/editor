@@ -12,11 +12,9 @@ export default function WelcomeScreen({ onOpen, onNewFile, onOpenFolder }: Props
       <p>A focused editor for coding and writing.</p>
 
       <div className="welcome-actions">
-        <button onClick={onNewFile}>New File</button>
-
-        <button onClick={onOpen}>Open File</button>
-
-        <button onClick={onOpenFolder}>Open Folder</button>
+        <button className="newfile" onClick={onNewFile}>New File</button>
+        <button className="openfile" onClick={onOpen}>Open File</button>
+        <button className="openfolder" onClick={onOpenFolder}>Open Folder</button>
       </div>
     </div>
   );

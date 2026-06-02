@@ -1,4 +1,5 @@
 pub mod fs;
+pub mod search;
 
 use tauri::{
     menu::{Menu, Submenu, MenuItem},
@@ -6,6 +7,7 @@ use tauri::{
 };
 
 use fs::{read_dir, read_file, write_file, read_workspace, path_exists};
+use search::{search_workspace};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -71,7 +73,8 @@ pub fn run() {
             read_file,
             write_file,
             read_workspace,
-            path_exists
+            path_exists,
+            search_workspace,
         ])
         .run(tauri::generate_context!())
         .expect("error while running application");
