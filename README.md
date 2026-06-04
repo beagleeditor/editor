@@ -7,6 +7,7 @@ It was planned to use Electron, but then, we moved on to Tauri (Rust), because E
 ## Building
 
 ### Software Requirements
+
 - [Rust](https://rust-lang.org)
 - [Bun](https://bun.com)
 

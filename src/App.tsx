@@ -1,113 +1,33 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import Editor from "@monaco-editor/react";
+import * as monaco from 'monaco-editor';
+import { Editor, loader } from "@monaco-editor/react";
 
 import { listen } from "@tauri-apps/api/event";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { fsAPI } from "./lib/fs";
 import { homeDir } from "@tauri-apps/api/path";
+import { Store } from "@tauri-apps/plugin-store";
 
 import ActivityBar from "./components/ActivityBar";
 import Explorer from "./components/Explorer";
 import EditorTabs from "./components/EditorTabs";
 import StatusBar from "./components/StatusBar";
 import WelcomeScreen from "./components/WelcomeScreen";
+import SearchView from "./components/SearchView";
+import SettingsPage from "./components/Settings";
+
+import { searchAPI } from "./lib/search";
 
 import "./App.css";
-import SearchView from "./components/SearchView";
-import { searchAPI } from "./lib/search";
-import { Store } from "@tauri-apps/plugin-store";
+import { useSettings } from "./lib/useSettings";
+import SourceControl from "./components/SourceControl";
 
-const store = await Store.load("layout.json");
-
-function detectLanguage(filename: string): string {
-  const ext = filename.split(".").pop()?.toLowerCase();
-
-  switch (ext) {
-    case "rs":
-      return "rust";
-
-    case "py":
-      return "python";
-
-    case "js":
-      return "javascript";
-
-    case "ts":
-      return "typescript";
-
-    case "jsx":
-      return "javascript";
-
-    case "tsx":
-      return "typescript";
-
-    case "html":
-      return "html";
-
-    case "css":
-      return "css";
-
-    case "json":
-      return "json";
-
-    case "md":
-      return "markdown";
-
-    case "c":
-      return "c";
-
-    case "cpp":
-    case "cc":
-    case "cxx":
-      return "cpp";
-
-    case "java":
-      return "java";
-
-    case "go":
-      return "go";
-
-    case "php":
-      return "php";
-
-    case "rb":
-      return "ruby";
-
-    case "sh":
-      return "shell";
-
-    case "yaml":
-    case "yml":
-      return "yaml";
-
-    case "toml":
-      return "toml";
-
-    default:
-      return "plaintext";
-  }
-}
-
-function flattenTree(node: FileNode): FileNode[] {
-  const result: FileNode[] = [node];
-
-  const children = (node as any).children;
-
-  if (children) {
-    for (const child of children) {
-      result.push(...flattenTree(child));
-    }
-  }
-
-  return result;
-}
-
-/* -------------------------------------------------------
-   TYPES
-------------------------------------------------------- */
+/* ---------------- TYPES ---------------- */
 
 type SidebarView = "files" | "search" | "git" | "settings";
-type Theme = "dark" | "light";
+type Theme = "dark" | "light" | "system";
+
+loader.config({ monaco });
 
 type FileNode = {
   name: string;
@@ -125,23 +45,85 @@ type Tab = {
   dirty: boolean;
 };
 
-/* -------------------------------------------------------
+/* ---------------- STORE ---------------- */
+
+const storePromise = Store.load("settings.json");
+
+/* ---------------- LANGUAGE DETECTOR ---------------- */
+
+function detectLanguage(filename: string): string {
+  const ext = filename.split(".").pop()?.toLowerCase();
+
+  switch (ext) {
+    case "rs":
+      return "rust";
+    case "py":
+      return "python";
+    case "js":
+      return "javascript";
+    case "ts":
+      return "typescript";
+    case "jsx":
+      return "javascript";
+    case "tsx":
+      return "typescript";
+    case "html":
+      return "html";
+    case "css":
+      return "css";
+    case "json":
+      return "json";
+    case "md":
+      return "markdown";
+    case "cpp":
+    case "cc":
+    case "cxx":
+      return "cpp";
+    case "java":
+      return "java";
+    default:
+      return "plaintext";
+  }
+}
+
+/* =======================================================
    APP
-------------------------------------------------------- */
+======================================================= */
 
 export default function App() {
   /* ---------------- UI STATE ---------------- */
 
   const [showWelcome, setShowWelcome] = useState(true);
-  const [theme, setTheme] = useState<Theme>("dark");
 
   const [sidebarView, setSidebarView] = useState<SidebarView>("files");
   const [sidebarVisible, setSidebarVisible] = useState(true);
 
   const [sidebarWidth, setSidebarWidth] = useState(280);
+
   const resizingRef = useRef(false);
-  const startXRef = useRef(0);
-  const startWidthRef = useRef(0);
+  const startX = useRef(0);
+  const startWidth = useRef(0);
+
+  const editorRef = useRef<any>(null);
+
+  const { settings, update } = useSettings();
+
+  /* ---------------- SETTINGS STORE ---------------- */
+
+  const [store, setStore] = useState<any>(null);
+
+  useEffect(() => {
+    (async () => {
+      const s = await storePromise;
+      setStore(s);
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!store) return;
+    store.set("sidebarWidth", sidebarWidth);
+    store.save();
+  }, [sidebarWidth, store]);
 
   /* ---------------- FILE SYSTEM ---------------- */
 
@@ -155,9 +137,9 @@ export default function App() {
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
 
-  /* -------------------------------------------------------
-     NEW TAB
-  ------------------------------------------------------- */
+  /* =======================================================
+     FILE ACTIONS
+  ======================================================= */
 
   const newFile = () => {
     const id = crypto.randomUUID();
@@ -178,15 +160,8 @@ export default function App() {
     setShowWelcome(false);
   };
 
-  /* -------------------------------------------------------
-     OPEN FILE
-  ------------------------------------------------------- */
-
   const openFile = useCallback(async () => {
-    const selected = await open({
-      multiple: false,
-      directory: false,
-    });
+    const selected = await open({ multiple: false });
 
     if (!selected || Array.isArray(selected)) return;
 
@@ -211,10 +186,6 @@ export default function App() {
     setShowWelcome(false);
   }, []);
 
-  /* -------------------------------------------------------
-     SAVE FILE
-  ------------------------------------------------------- */
-
   const saveFile = useCallback(async () => {
     if (!activeTab) return;
 
@@ -238,15 +209,8 @@ export default function App() {
     );
   }, [activeTab]);
 
-  /* -------------------------------------------------------
-     OPEN FOLDER (FIXED CORE ISSUE)
-  ------------------------------------------------------- */
-
   const openFolder = async () => {
-    const dir = await open({
-      directory: true,
-      multiple: false,
-    });
+    const dir = await open({ directory: true });
 
     if (!dir || Array.isArray(dir)) return;
 
@@ -255,21 +219,15 @@ export default function App() {
 
     const entries = await fsAPI.readDir(dir);
 
-    const tree: FileNode = {
+    setFileTree({
       name: dir.split(/[/\\]/).pop() ?? "root",
       path: dir,
       is_dir: true,
-      children: entries, // 🔥 direct pass-through
-    };
-
-    setFileTree(tree);
+      children: entries,
+    });
   };
 
-  /* -------------------------------------------------------
-     OPEN FROM EXPLORER
-  ------------------------------------------------------- */
-
-  const openFileFromExplorer = async (path: string, line?: number) => {
+  const openFileFromExplorer = async (path: string) => {
     const text = await fsAPI.readFile(path);
     const name = path.split(/[/\\]/).pop() ?? "file";
 
@@ -288,24 +246,15 @@ export default function App() {
     ]);
 
     setActiveTabId(id);
-
-    // wait for editor to mount + render tab
-    setTimeout(() => {
-      if (!editorRef.current || !line) return;
-
-      editorRef.current.revealLineInCenter(line);
-      editorRef.current.setPosition({
-        lineNumber: line,
-        column: 1,
-      });
-
-      editorRef.current.focus();
-    }, 50);
   };
 
-  /* -------------------------------------------------------
-     UPDATE CONTENT
-  ------------------------------------------------------- */
+  const changeLanguage = (lang: string) => {
+    if (!activeTab) return;
+
+    setTabs((prev) =>
+      prev.map((t) => (t.id === activeTab.id ? { ...t, language: lang } : t)),
+    );
+  };
 
   const updateContent = (value?: string) => {
     if (!activeTab) return;
@@ -317,113 +266,62 @@ export default function App() {
     );
   };
 
-  const changeLanguage = (lang: string) => {
-    if (!activeTab) return;
+  /* =======================================================
+     MENU EVENTS
+  ======================================================= */
 
-    setTabs((prev) =>
-      prev.map((t) => (t.id === activeTab.id ? { ...t, language: lang } : t)),
-    );
-  };
-
-  /* -------------------------------------------------------
-     MENU BUTTONS
-------------------------------------------------------- */
   useEffect(() => {
-    let unlistenOpen: (() => void) | undefined;
-    let unlistenSave: (() => void) | undefined;
+    let u1: any;
+    let u2: any;
 
     (async () => {
-      unlistenOpen = await listen("menu-open", () => {
-        openFile();
-      });
-
-      unlistenSave = await listen("menu-save", () => {
-        saveFile();
-      });
+      u1 = await listen("menu-open", openFile);
+      u2 = await listen("menu-save", saveFile);
     })();
 
     return () => {
-      unlistenOpen?.();
-      unlistenSave?.();
+      u1?.();
+      u2?.();
     };
   }, [openFile, saveFile]);
 
-  useEffect(() => {
-    const load = async () => {
-      const saved = await store.get<number>("sidebarWidth");
-      if (saved) setSidebarWidth(saved);
-    };
-
-    load();
-  }, []);
-
-  const searchableFiles = fileTree ? flattenTree(fileTree) : [];
-
-  const openQuickOpen = async (query: string) => {
-    const files = await searchAPI.listFiles(workspaceDir!);
-
-    return files
-      .filter((f) => f.name.toLowerCase().includes(query.toLowerCase()))
-      .slice(0, 50);
-  };
-
-  const search = (q: string) => {
-    if (!workspaceDir) return Promise.resolve([]);
-
-    return searchAPI.searchWorkspace(workspaceDir, q);
-  };
-
-  const editorRef = useRef<any>(null);
-  const sidebarRef = useRef<HTMLDivElement>(null);
-  const sidebarWidthRef = useRef(sidebarWidth);
+  /* =======================================================
+     SIDEBAR RESIZE
+  ======================================================= */
 
   useEffect(() => {
-    sidebarWidthRef.current = sidebarWidth;
-  }, [sidebarWidth]);
-
-  useEffect(() => {
-    const onMove = (e: MouseEvent) => {
+    const move = (e: MouseEvent) => {
       if (!resizingRef.current) return;
 
-      const delta = e.clientX - startXRef.current;
-
-      const newWidth = startWidthRef.current + delta;
-
-      setSidebarWidth(Math.max(180, Math.min(500, newWidth)));
+      const dx = e.clientX - startX.current;
+      setSidebarWidth(Math.max(180, Math.min(500, startWidth.current + dx)));
     };
-    
-    const onUp = async () => {
+
+    const up = () => {
       resizingRef.current = false;
-
-      await store.set("sidebarWidth", sidebarWidthRef.current);
-      await store.save();
     };
 
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
 
     return () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
     };
   }, []);
 
-  /* -------------------------------------------------------
+  /* =======================================================
      RENDER
-------------------------------------------------------- */
+  ======================================================= */
 
   return (
-    <div className={`app theme-${theme}`}>
+    <div className={`app theme-${settings?.theme}`}>
       <div className="workspace">
         <ActivityBar active={sidebarView} onSelect={setSidebarView} />
 
         {sidebarVisible && (
           <div className="sidebar-container">
-            <div
-              className="sidebar"
-              ref={sidebarRef}
-              style={{ width: sidebarWidth }}
-            >
+            <div className="sidebar" style={{ width: sidebarWidth }}>
               {sidebarView === "files" && (
                 <Explorer tree={fileTree} onOpenFile={openFileFromExplorer} />
               )}
@@ -431,22 +329,26 @@ export default function App() {
               {sidebarView === "search" && (
                 <SearchView
                   root={workspaceDir}
-                  search={search}
+                  search={(q) =>
+                    workspaceDir
+                      ? searchAPI.searchWorkspace(workspaceDir, q)
+                      : Promise.resolve([])
+                  }
                   onOpenFile={openFileFromExplorer}
                 />
               )}
 
-              {sidebarView === "git" && <div>Git UI</div>}
-              {sidebarView === "settings" && <div>Settings UI</div>}
+              {sidebarView === "git" && <SourceControl></SourceControl>}
+
+              {sidebarView === "settings" && <SettingsPage />}
             </div>
+
             <div
               className="resizer"
               onMouseDown={(e) => {
                 resizingRef.current = true;
-                startXRef.current = e.clientX;
-                startWidthRef.current = sidebarWidth;
-                const newWidth =
-                  startWidthRef.current + (e.clientX - startXRef.current);
+                startX.current = e.clientX;
+                startWidth.current = sidebarWidth;
               }}
             />
           </div>
@@ -458,17 +360,7 @@ export default function App() {
             activeTabId={activeTabId}
             onSelect={setActiveTabId}
             onNewTab={newFile}
-            onClose={(id) => {
-              setTabs((prev) => {
-                const remaining = prev.filter((t) => t.id !== id);
-
-                if (activeTabId === id) {
-                  setActiveTabId(remaining[0]?.id ?? null);
-                }
-
-                return remaining;
-              });
-            }}
+            onClose={(id) => setTabs((prev) => prev.filter((t) => t.id !== id))}
           />
 
           {showWelcome || tabs.length === 0 ? (
@@ -479,17 +371,24 @@ export default function App() {
             />
           ) : (
             <Editor
+              key={`${settings?.theme}-${settings?.fontSize}`}
               language={activeTab?.language ?? "plaintext"}
               value={activeTab?.content ?? ""}
               onChange={updateContent}
-              onMount={(editor) => {
-                editorRef.current = editor;
-              }}
-              theme={theme === "dark" ? "vs-dark" : "vs"}
+              theme={settings?.theme === "dark" ? "vs-dark" : "vs"}
               options={{
                 automaticLayout: true,
-                minimap: { enabled: false },
+                minimap: {
+                  enabled: settings?.minimap ?? false,
+                },
                 scrollBeyondLastLine: false,
+                tabCompletion: "on",
+                quickSuggestions: true,
+                contextmenu: true,
+                copyWithSyntaxHighlighting: true,
+                fontSize: Math.max(10, settings?.fontSize ?? 14),
+                tabSize: settings?.tabSize ?? 2,
+                wordWrap: settings?.wordWrap ? "on" : "off",
               }}
             />
           )}
