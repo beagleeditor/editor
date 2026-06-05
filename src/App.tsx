@@ -22,7 +22,9 @@ import { searchAPI } from "./lib/search";
 import "./App.css";
 import { useSettings } from "./lib/useSettings";
 import SourceControl from "./components/SourceControl";
+import { Tab } from "./components/EditorTabs";
 import About from "./components/About";
+import Dialog from "./components/Dialog";
 
 /* ---------------- TYPES ---------------- */
 
@@ -36,15 +38,6 @@ type FileNode = {
   path: string;
   is_dir: boolean;
   children?: FileNode[];
-};
-
-type Tab = {
-  id: string;
-  path: string | null;
-  name: string;
-  content: string;
-  language: string;
-  dirty: boolean;
 };
 
 /* ---------------- STORE ---------------- */
@@ -126,6 +119,8 @@ export default function App() {
   const editorRef = useRef<any>(null);
 
   const [showAbout, setShowAbout] = useState(false);
+
+  const [tabToClose, setTabToClose] = useState<Tab | null>(null);
 
   const { settings, update } = useSettings();
 
@@ -418,10 +413,45 @@ export default function App() {
               activeTabId={activeTabId}
               onSelect={setActiveTabId}
               onNewTab={newFile}
-              onClose={(id) =>
-                setTabs((prev) => prev.filter((t) => t.id !== id))
-              }
+              onClose={(tab) => {
+                console.log("on close");
+                if (tab.dirty) {
+                  console.log("tab is dirty");
+                  setTabToClose(tab); // open dialog
+                  console.log("RENDER", {
+                    tabToClose,
+                    tabs: tabs.length,
+                  });
+                  console.log("setTabToClose: ", tabToClose);
+                  return;
+                }
+                setTabs((prev) => prev.filter((t) => t.id !== tab.id));
+
+                console.log("closed");
+              }}
             />
+            {tabToClose && (
+              <>
+                {console.log("Hello! There's a tabToClose")}
+                <Dialog
+                  title="You didn't save the file"
+                  message="Are you sure you wanna close the tab?"
+                  onCancel={() => {
+                    setTabToClose(null);
+                  }}
+                  onConfirm={() => {
+                    if (!tabToClose) return;
+
+                    setTabs((prev) =>
+                      prev.filter((t) => t.id !== tabToClose.id),
+                    );
+
+                    setTabToClose(null);
+                    console.log("I am really closed");
+                  }}
+                />
+              </>
+            )}
 
             {showAbout ? (
               <About onBack={() => setShowAbout(false)} />

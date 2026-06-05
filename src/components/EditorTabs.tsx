@@ -1,6 +1,9 @@
-type Tab = {
+export type Tab = {
   id: string;
   name: string;
+  path: string | null;
+  content: string;
+  language: string;
   dirty: boolean;
 };
 
@@ -9,7 +12,7 @@ type Props = {
   activeTabId: string | null;
   onSelect: (id: string) => void;
   onNewTab: () => void;
-  onClose: (id: string) => void;
+  onClose: (tab: Tab) => void; // 👈 IMPORTANT CHANGE
 };
 
 export default function EditorTabs({
@@ -38,7 +41,7 @@ export default function EditorTabs({
             className="tab-close"
             onClick={(e) => {
               e.stopPropagation();
-              onClose(tab.id);
+              onClose(tab); // 👈 send full tab
             }}
           >
             ×
