@@ -1,13 +1,25 @@
 import { Theme } from "../App";
 
 type Props = {
-    theme: Theme;
-}
+  theme: Theme;
+  query: string;
+  onQueryChange: (value: string) => void;
+  onOpenQuickOpen: () => void;
+};
 
-export default function TitleBar({ theme }: Props) {
+export default function TitleBar({ theme, query, onQueryChange, onOpenQuickOpen }: Props) {
   return (
     <div className={`titlebar theme-${theme}`}>
-      <input className="titlebar-search" placeholder="Search files..." />
+      <input
+        className="titlebar-search"
+        placeholder="Quick Open..."
+        value={query}
+        onChange={(e) => {
+          onQueryChange(e.target.value);
+          onOpenQuickOpen();
+        }}
+        onFocus={onOpenQuickOpen}
+      />
     </div>
   );
 }

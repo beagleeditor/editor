@@ -1,9 +1,9 @@
 export default function SourceControl() {
     return (
-        <div className="settings-panel">
-            <div className="search-title">SETTINGS</div>
+        <div className="sc-panel">
+            <div className="sc-title">SOURCE CONTROL</div>
 
-            <div className="settings-content">
+            <div className="sc-content">
                 <p>Git coming soon!</p>
             </div>
         </div>

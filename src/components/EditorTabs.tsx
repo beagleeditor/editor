@@ -1,3 +1,5 @@
+import { FileIcon } from "./Explorer";
+
 export type Tab = {
   id: string;
   name: string;
@@ -30,6 +32,8 @@ export default function EditorTabs({
           className={`tab ${tab.id === activeTabId ? "active" : ""}`}
           onClick={() => onSelect(tab.id)}
         >
+          {/* FILE ICON */}
+          <FileIcon name={tab.name} isDir={false} />
           {/* FILE NAME */}
           <span className="tab-label">
             {tab.name}

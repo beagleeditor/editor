@@ -26,6 +26,7 @@ import SourceControl from "./components/SourceControl";
 import { Tab } from "./components/EditorTabs";
 import About from "./components/About";
 import Dialog from "./components/Dialog";
+import QuickOpen from "./components/QuickOpen";
 
 /* ---------------- TYPES ---------------- */
 
@@ -60,7 +61,7 @@ function resolveTheme(theme: "dark" | "light" | "system") {
 
 /* ---------------- LANGUAGE DETECTOR ---------------- */
 
-function detectLanguage(filename: string): string {
+export function detectLanguage(filename: string): string {
   const ext = filename.split(".").pop()?.toLowerCase();
 
   switch (ext) {
@@ -99,6 +100,31 @@ function detectLanguage(filename: string): string {
   }
 }
 
+type FlatFile = {
+  name: string;
+  path: string;
+};
+
+function flattenTree(node: FileNode | null): FlatFile[] {
+  if (!node) return [];
+
+  const result: FlatFile[] = [];
+
+  function walk(n: FileNode) {
+    if (!n.is_dir) {
+      result.push({
+        name: n.name,
+        path: n.path,
+      });
+    }
+
+    n.children?.forEach(walk);
+  }
+
+  walk(node);
+  return result;
+}
+
 /* =======================================================
    APP
 ======================================================= */
@@ -123,7 +149,12 @@ export default function App() {
 
   const [tabToClose, setTabToClose] = useState<Tab | null>(null);
 
+  const [showQuickOpen, setShowQuickOpen] = useState(false);
+
   const { settings, update } = useSettings();
+
+  const [quickOpenVisible, setQuickOpenVisible] = useState(false);
+  const [quickOpenQuery, setQuickOpenQuery] = useState("");
 
   /* ---------------- SETTINGS STORE ---------------- */
 
@@ -360,13 +391,49 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        setShowQuickOpen(true);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
   /* =======================================================
      RENDER
   ======================================================= */
 
   return (
     <div className="app-shell">
-      <TitleBar theme={theme} />
+      {quickOpenVisible && (
+        <QuickOpen
+          theme={theme}
+          files={flattenTree(fileTree)}
+          query={quickOpenQuery}
+          onQueryChange={setQuickOpenQuery}
+          onOpen={openFileFromExplorer}
+          onClose={() => {
+            setQuickOpenVisible(false);
+            setQuickOpenQuery("");
+          }}
+        />
+      )}
+
+      <TitleBar
+        theme={theme}
+        query={quickOpenQuery}
+        onQueryChange={setQuickOpenQuery}
+        onOpenQuickOpen={() => {
+          setQuickOpenVisible(true);
+        }}
+      />
       <div className={`app theme-${theme}`}>
         <div className="workspace">
           <ActivityBar active={sidebarView} onSelect={setSidebarView} />
@@ -453,7 +520,6 @@ export default function App() {
                 />
               </>
             )}
-
             {showAbout ? (
               <About onBack={() => setShowAbout(false)} />
             ) : showWelcome || tabs.length === 0 ? (

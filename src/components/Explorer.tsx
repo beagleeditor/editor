@@ -17,7 +17,7 @@ type Props = {
    our own icons in future.
 ------------------------------------------------------- */
 
-function FileIcon({ name, isDir }: { name: string; isDir: boolean }) {
+export function FileIcon({ name, isDir }: { name: string; isDir: boolean }) {
   if (isDir) {
     return <Icon icon="vscode-icons:default-folder" width="16" height="16" />;
   }
