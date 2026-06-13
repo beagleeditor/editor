@@ -1,7 +1,7 @@
 export default function About({ onBack }: { onBack: () => void }) {
   return (
     <div className="welcome">
-      <h1>BeagleEditor</h1>
+      <h1>BeagleEditor (Persepolis)</h1>
 
       <p style={{ color: "var(--muted)", textAlign: "center", maxWidth: 420 }}>
         A "beagleful" code editor.
@@ -12,7 +12,7 @@ export default function About({ onBack }: { onBack: () => void }) {
       </div>
 
       <div style={{ marginTop: 20, color: "var(--muted)", fontSize: 13 }}>
-        <div>Version: 0.1.0</div>
+        <div>Version: 2026.1.0 "Evolve"</div>
         <div>Built with React + Monaco + Tauri</div>
       </div>
     </div>
