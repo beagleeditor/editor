@@ -962,8 +962,7 @@ body {
   border: 1px solid var(--border);
   border-radius: 16px;
 
-  box-shadow:
-    0 16px 48px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3);
 
   color: var(--text);
 }
@@ -1055,21 +1054,18 @@ body {
   position: fixed;
   inset: 0;
 
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-
-  padding-top: 64px;
-
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-
-  background: rgba(0, 0, 0, 0.15);
+  background: transparent; /* no full-screen centering */
 
   z-index: 9999;
 }
 
 .quickopen {
+  position: absolute;
+
+  top: 36px; /* just under titlebar */
+  left: 50%;
+  transform: translateX(-50%);
+
   width: 700px;
   max-width: calc(100vw - 40px);
 

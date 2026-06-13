@@ -41,6 +41,14 @@ type FileNode = {
   children?: FileNode[];
 };
 
+type SessionState = {
+  workspaceDir: string | null;
+  tabs: Tab[];
+  activeTabId: string | null;
+  timestamp: number;
+  version: number;
+};
+
 /* ---------------- STORE ---------------- */
 
 const storePromise = Store.load("settings.json");
@@ -143,12 +151,16 @@ export default function App() {
   const startWidth = useRef(0);
 
   const editorRef = useRef<any>(null);
+  const didValidateRef = useRef(false);
+  const hydratedRef = useRef(false);
 
   const [showAbout, setShowAbout] = useState(false);
 
   const [tabToClose, setTabToClose] = useState<Tab | null>(null);
 
   const [showQuickOpen, setShowQuickOpen] = useState(false);
+
+  const [booting, setBooting] = useState(true);
 
   const { settings, update } = useSettings();
 
@@ -208,6 +220,70 @@ export default function App() {
     setActiveTabId(id);
     setShowWelcome(false);
   };
+
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+
+    const session: SessionState = {
+      workspaceDir,
+      tabs,
+      activeTabId,
+      timestamp: Date.now(),
+      version: 1,
+    };
+
+    localStorage.setItem("beagle-session", JSON.stringify(session));
+  }, [workspaceDir, tabs, activeTabId]);
+
+  useEffect(() => {
+    const raw = localStorage.getItem("beagle-session");
+
+    if (!raw) {
+      setBooting(false);
+      hydratedRef.current = true;
+      return;
+    }
+
+    try {
+      const session: SessionState = JSON.parse(raw);
+
+      if (session.workspaceDir) {
+        setWorkspaceDir(session.workspaceDir);
+      }
+
+      setTabs(session.tabs || []);
+      setActiveTabId(session.activeTabId);
+
+      setShowWelcome(false);
+    } finally {
+      setBooting(false);
+
+      // 💥 IMPORTANT: allow saving AFTER restore is fully applied
+      setTimeout(() => {
+        hydratedRef.current = true;
+      }, 0);
+    }
+  }, []);
+
+  const validateSession = useCallback(async () => {
+    const validTabs: Tab[] = [];
+
+    for (const tab of tabs) {
+      if (!tab.path) {
+        validTabs.push(tab);
+        continue;
+      }
+
+      try {
+        const exists = await fsAPI.exists(tab.path);
+        if (exists) validTabs.push(tab);
+      } catch {
+        // ignore broken file
+      }
+    }
+
+    setTabs(validTabs);
+  }, [tabs]);
 
   const openFile = useCallback(async () => {
     const selected = await open({ multiple: false });
@@ -451,6 +527,27 @@ export default function App() {
     }, 100);
   };
 
+  const closeTab = (id: string) => {
+    setTabs((prev) => {
+      const updated = prev.filter((t) => t.id !== id);
+
+      if (activeTabId === id) {
+        setActiveTabId(updated.length ? updated[updated.length - 1].id : null);
+      }
+
+      return updated;
+    });
+  };
+
+  const requestCloseTab = (tab: Tab) => {
+    if (tab.dirty) {
+      setTabToClose(tab);
+      return;
+    }
+
+    closeTab(tab.id);
+  };
+
   const renameItem = async () => {
     if (!renameTarget || !renamePath.trim()) return;
 
@@ -506,10 +603,7 @@ export default function App() {
       prev.filter((tab) => {
         if (!tab.path) return true;
 
-        return (
-          tab.path !== target &&
-          !tab.path.startsWith(`${target}/`)
-        );
+        return tab.path !== target && !tab.path.startsWith(`${target}/`);
       }),
     );
 
@@ -524,6 +618,14 @@ export default function App() {
 
     await reloadWorkspace();
   };
+
+  if (booting) {
+    return (
+      <div className="app-shell">
+        <div style={{ padding: 20 }}>Restoring session...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="app-shell">
@@ -624,22 +726,7 @@ export default function App() {
               activeTabId={activeTabId}
               onSelect={setActiveTabId}
               onNewTab={newFile}
-              onClose={(tab) => {
-                console.log("on close");
-                if (tab.dirty) {
-                  console.log("tab is dirty");
-                  setTabToClose(tab); // open dialog
-                  console.log("RENDER", {
-                    tabToClose,
-                    tabs: tabs.length,
-                  });
-                  console.log("setTabToClose: ", tabToClose);
-                  return;
-                }
-                setTabs((prev) => prev.filter((t) => t.id !== tab.id));
-
-                console.log("closed");
-              }}
+              onClose={(tab) => requestCloseTab(tab)}
             />
             {tabToClose && (
               <Dialog
@@ -651,10 +738,8 @@ export default function App() {
                 onConfirm={() => {
                   if (!tabToClose) return;
 
-                  setTabs((prev) => prev.filter((t) => t.id !== tabToClose.id));
-
+                  closeTab(tabToClose.id);
                   setTabToClose(null);
-                  console.log("I am really closed");
                 }}
               />
             )}
@@ -706,7 +791,7 @@ export default function App() {
             )}
             {showAbout ? (
               <About onBack={() => setShowAbout(false)} />
-            ) : showWelcome || tabs.length === 0 ? (
+            ) : !activeTab ? (
               <WelcomeScreen
                 onOpen={openFile}
                 onNewFile={newFile}
