@@ -452,18 +452,77 @@ export default function App() {
   };
 
   const renameItem = async () => {
-    console.log("Rename requested:", renameTarget, "->", renamePath);
+    if (!renameTarget || !renamePath.trim()) return;
+
+    const parent = renameTarget.split(/[/\\]/).slice(0, -1).join("/");
+    const newPath = `${parent}/${renamePath}`;
+
+    await fsAPI.renamePath(renameTarget, newPath);
+
+    setTabs((prev) =>
+      prev.map((tab) => {
+        if (!tab.path) return tab;
+
+        if (tab.path === renameTarget) {
+          return {
+            ...tab,
+            path: newPath,
+            name: renamePath,
+          };
+        }
+
+        if (tab.path.startsWith(`${renameTarget}/`)) {
+          const updatedPath = tab.path.replace(renameTarget, newPath);
+
+          return {
+            ...tab,
+            path: updatedPath,
+            name: updatedPath.split(/[/\\]/).pop() ?? tab.name,
+          };
+        }
+
+        return tab;
+      }),
+    );
+
     setRenameTarget(null);
     setRenamePath("");
+
+    if (activeTab?.path === renameTarget) {
+      setActiveTabId((current) => current);
+    }
+
+    await reloadWorkspace();
   };
 
   const deleteItem = async () => {
-    console.error(
-      "Delete is not implemented yet. Add a delete command to fsAPI and the Tauri backend.",
-      deleteTarget,
+    if (!deleteTarget) return;
+
+    const target = deleteTarget;
+
+    await fsAPI.deletePath(target);
+
+    setTabs((prev) =>
+      prev.filter((tab) => {
+        if (!tab.path) return true;
+
+        return (
+          tab.path !== target &&
+          !tab.path.startsWith(`${target}/`)
+        );
+      }),
     );
 
+    if (
+      activeTab?.path === target ||
+      activeTab?.path?.startsWith(`${target}/`)
+    ) {
+      setActiveTabId(null);
+    }
+
     setDeleteTarget(null);
+
+    await reloadWorkspace();
   };
 
   return (
@@ -508,19 +567,23 @@ export default function App() {
                     showCreateDialog={(type) => {
                       console.log("showCreateDialog called:", type);
                       setCreateType(type);
-                      setCreatePath(
-                        type === "file"
-                          ? "lib/fs.ts"
-                          : "lib",
-                      );
+                      setCreatePath(type === "file" ? "lib/fs.ts" : "lib");
                     }}
                     onRename={(path) => {
                       const name = path.split(/[/\\]/).pop() ?? "";
+
                       setRenameTarget(path);
                       setRenamePath(name);
                     }}
                     onDelete={(path) => {
                       setDeleteTarget(path);
+                    }}
+                    onRevealInFinder={async (path) => {
+                      try {
+                        await fsAPI.revealInFinder(path);
+                      } catch (err) {
+                        console.error("Failed to reveal path:", err);
+                      }
                     }}
                   />
                 )}
@@ -718,7 +781,7 @@ export default function App() {
                 options={{
                   automaticLayout: true,
                   minimap: {
-                    enabled: settings?.minimap ?? false,
+                    enabled: settings?.minimap ?? true,
                   },
                   scrollBeyondLastLine: false,
                   tabCompletion: "on",

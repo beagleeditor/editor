@@ -129,12 +129,11 @@ pub fn create_file(path: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn create_dir(path: String) -> Result<(), String> {
-    std::fs::create_dir_all(path)
-        .map_err(|e| e.to_string())
+    std::fs::create_dir_all(path).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn delete_path(path: String) -> Result<(), String> {
+pub fn delete_path(path: String) -> Result<(), String> {
     use std::fs;
     use std::path::Path;
 
@@ -144,6 +143,44 @@ fn delete_path(path: String) -> Result<(), String> {
         fs::remove_dir_all(p).map_err(|e| e.to_string())?;
     } else {
         fs::remove_file(p).map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn rename_path(old_path: String, new_path: String) -> Result<(), String> {
+    std::fs::rename(old_path, new_path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn reveal_in_finder(path: String) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .args(["-R", &path])
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .args(["/select,", &path])
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let parent = std::path::Path::new(&path)
+            .parent()
+            .ok_or("No parent directory")?;
+
+        std::process::Command::new("xdg-open")
+            .arg(parent)
+            .spawn()
+            .map_err(|e| e.to_string())?;
     }
 
     Ok(())

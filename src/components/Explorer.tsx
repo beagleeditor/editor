@@ -15,6 +15,7 @@ type Props = {
   showCreateDialog: (type: "file" | "folder") => void;
   onRename?: (path: string) => void;
   onDelete?: (path: string) => void;
+  onRevealInFinder?: (path: string) => void;
 };
 
 /* -------------------------------------------------------
@@ -85,6 +86,7 @@ export default function Explorer({
   showCreateDialog,
   onRename,
   onDelete,
+  onRevealInFinder,
 }: Props) {
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -92,6 +94,8 @@ export default function Explorer({
     path: string;
     isDir: boolean;
   } | null>(null);
+
+  const [refreshKey, setRefreshKey] = useState(0);
 
   return (
     <aside className="explorer">
@@ -132,7 +136,10 @@ export default function Explorer({
           <button
             className="explorer-action-btn"
             title="Reload"
-            onClick={() => onReload?.()}
+            onClick={async () => {
+              await onReload?.();
+              setRefreshKey((v) => v + 1);
+            }}
           >
             <Icon icon="mdi:refresh" width="16" style={{ color: "#fff" }} />
           </button>
@@ -146,6 +153,7 @@ export default function Explorer({
           </div>
         ) : (
           <TreeNode
+            key={`${tree.path}-${refreshKey}`}
             node={tree}
             depth={0}
             onOpenFile={onOpenFile}
@@ -192,12 +200,30 @@ export default function Explorer({
           <button
             className="context-menu-item"
             onClick={() => {
+              onRevealInFinder?.(contextMenu.path);
+              setContextMenu(null);
+            }}
+          >
+            Reveal in Finder
+          </button>
+
+          <button
+            className="context-menu-item"
+            onClick={() => {
               onRename?.(contextMenu.path);
               setContextMenu(null);
             }}
           >
             Rename
           </button>
+
+          <div
+            style={{
+              height: 1,
+              background: "var(--border)",
+              margin: "4px 0",
+            }}
+          />
 
           <button
             className="context-menu-item"

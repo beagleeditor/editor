@@ -22,12 +22,10 @@ export const fsAPI = {
     invoke("write_file", { path, content }),
 
   // Create empty file
-  createFile: (path: string): Promise<void> =>
-    invoke("create_file", { path }),
+  createFile: (path: string): Promise<void> => invoke("create_file", { path }),
 
   // Create directory (including nested directories)
-  createDir: (path: string): Promise<void> =>
-    invoke("create_dir", { path }),
+  createDir: (path: string): Promise<void> => invoke("create_dir", { path }),
 
   // Check if path exists
   exists: (path: string): Promise<boolean> => invoke("path_exists", { path }),
@@ -35,4 +33,16 @@ export const fsAPI = {
   // Optional: workspace root info
   readWorkspace: (path: string): Promise<FileNode> =>
     invoke("read_workspace", { path }),
+
+  deletePath: (path: string): Promise<boolean> =>
+    invoke("delete_path", { path }),
+
+  renamePath: (oldPath: string, newPath: string): Promise<void> =>
+    invoke("rename_path", {
+      oldPath,
+      newPath,
+    }),
+
+  revealInFinder: (path: string): Promise<void> =>
+    invoke("reveal_in_finder", { path }),
 };

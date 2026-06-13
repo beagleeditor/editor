@@ -5,7 +5,7 @@ use tauri::{
     Emitter, menu::{Menu, MenuItem, Submenu}
 };
 
-use fs::{path_exists, read_dir, read_file, read_workspace, write_file, create_file, create_dir};
+use fs::{path_exists, read_dir, read_file, read_workspace, write_file, create_file, create_dir, delete_path, rename_path, reveal_in_finder};
 use search::search_workspace;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -70,7 +70,9 @@ pub fn run() {
             search_workspace,
             create_file,
             create_dir,
-            
+            delete_path,
+            rename_path,
+            reveal_in_finder,
         ])
         .run(tauri::generate_context!())
         .expect("error while running application");
