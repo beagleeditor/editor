@@ -1,10 +1,16 @@
-# BeagleEditor: Redesigned
+# BeagleEditor
 
-This is a quite barebones version of the new BeagleEditor.
+The "beagleful" editor, now with a redesigned UI.
 
-It was planned to use Electron, but then, we moved on to Tauri (Rust), because Electron is sooooo slow.
+The old PyQt-based editor is now called BeagleEditor Legacy. If you want that, go to [beagleeditor/legacy repo](https://github.com/beagleeditor/legacy)
 
-## Building
+## Installation
+
+Download the latest binary from [GitHub Releases](https://github.com/beagleeditor/editor/releases)
+
+## Build Instructions
+
+To build BeagleEditor from source, you need the following.
 
 ### Software Requirements
 
