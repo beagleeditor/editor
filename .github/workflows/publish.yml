@@ -17,7 +17,7 @@ jobs:
             args: '--target x86_64-apple-darwin'
             name: 'mac-intel'
 
-          - platform: 'ubuntu-24.04'
+          - platform: 'ubuntu-22.04'
             args: ''
             name: 'linux'
 
