@@ -222,6 +222,8 @@ export default function App() {
 
   const [quickOpenVisible, setQuickOpenVisible] = useState(false);
   const [quickOpenQuery, setQuickOpenQuery] = useState("");
+  const [line, setLine] = useState(1);
+  const [column, setColumn] = useState(1);
 
   /* ---------------- SETTINGS STORE ---------------- */
 
@@ -485,11 +487,19 @@ export default function App() {
 
     editorRef.current.updateOptions({
       fontSize: settings.fontSize,
+      fontFamily: settings.fontFamily,
+      lineHeight: settings.lineHeight,
+      lineNumbers: settings.lineNumbers,
+      renderWhitespace: settings.renderWhitespace ? "all" : "none",
+      renderLineHighlight: settings.highlightCurrentLine ? "line" : "none",
+      cursorStyle: settings.cursorStyle,
+      cursorBlinking: settings.cursorBlinking,
       tabSize: settings.tabSize,
       wordWrap: settings.wordWrap ? "on" : "off",
       minimap: {
         enabled: settings.minimap,
       },
+      cursorSmoothCaretAnimation: settings.cursorSmoothCaretAnimation ? "on" : "off",
     });
   }, [settings]);
 
@@ -502,12 +512,16 @@ export default function App() {
     let u2: any;
     let u3: any;
     let u4: any;
+    let u5: any;
 
     (async () => {
       u1 = await listen("menu-open", openFile);
-      u2 = await listen("menu-save", saveFile);
-      u3 = await listen("menu-settings", openSettings);
-      u4 = await listen("menu-about", openAbout);
+      u2 = await listen("menu-open-folder", () => {
+        void openFolder();
+      });
+      u3 = await listen("menu-save", saveFile);
+      u4 = await listen("menu-settings", openSettings);
+      u5 = await listen("menu-about", openAbout);
     })();
 
     return () => {
@@ -515,6 +529,7 @@ export default function App() {
       u2?.();
       u3?.();
       u4?.();
+      u5?.();
     };
   }, [openFile, saveFile, openSettings, openAbout]);
 
@@ -870,6 +885,15 @@ export default function App() {
                 onMount={(editor, monaco) => {
                   editorRef.current = editor;
 
+                  const pos = editor.getPosition();
+                  setLine(pos?.lineNumber ?? 1);
+                  setColumn(pos?.column ?? 1);
+
+                  editor.onDidChangeCursorPosition((e) => {
+                    setLine(e.position.lineNumber);
+                    setColumn(e.position.column);
+                  });
+
                   const KM = monaco.KeyMod;
                   const KC = monaco.KeyCode;
 
@@ -938,8 +962,16 @@ export default function App() {
                   contextmenu: true,
                   copyWithSyntaxHighlighting: true,
                   fontSize: Math.max(10, settings?.fontSize ?? 14),
+                  fontFamily: settings?.fontFamily,
+                  lineHeight: settings?.lineHeight,
+                  lineNumbers: settings?.lineNumbers,
+                  renderWhitespace: settings?.renderWhitespace ? "all" : "none",
+                  renderLineHighlight: settings?.highlightCurrentLine ? "line" : "none",
+                  cursorStyle: settings?.cursorStyle,
+                  cursorBlinking: settings?.cursorBlinking,
                   tabSize: settings?.tabSize ?? 2,
                   wordWrap: settings?.wordWrap ? "on" : "off",
+                  cursorSmoothCaretAnimation: settings?.cursorSmoothCaretAnimation ? "on" : "off",
                 }}
               />
             )}
@@ -951,6 +983,10 @@ export default function App() {
           lineEnding="LF"
           encoding="UTF-8"
           onLanguageChange={changeLanguage}
+          line={line}
+          column={column}
+          tabSize={settings.tabSize}
+          insertSpaces={true}
         />
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { fsAPI, FileNode } from "../lib/fs";
 import { Icon } from "@iconify/react";
 
@@ -156,6 +156,7 @@ export default function Explorer({
             key={`${tree.path}-${refreshKey}`}
             node={tree}
             depth={0}
+            defaultOpen={true}
             onOpenFile={onOpenFile}
             onContextMenu={setContextMenu}
           />
@@ -266,6 +267,23 @@ function TreeNode({
   const [children, setChildren] = useState<FileNode[] | null>(null);
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    if (!defaultOpen || children) return;
+
+    (async () => {
+      setLoading(true);
+      try {
+        const result = await fsAPI.readDir(node.path);
+        setChildren(Array.isArray(result) ? result : []);
+      } catch (err) {
+        console.error("Failed to read folder:", err);
+        setChildren([]);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [defaultOpen, children, node.path]);
+
   // 🔥 normalize BOTH naming styles (fixes Tauri mismatch bugs)
   const isDir = (node as any).is_dir ?? (node as any).isDir;
 
@@ -349,12 +367,18 @@ function TreeNode({
         }}
       >
         <Icon
+          icon={open ? "mdi:chevron-down" : "mdi:chevron-right"}
+          width="14"
+          style={{ marginRight: 2, opacity: 0.8 }}
+        />
+        <Icon
           icon={
             open
               ? "vscode-icons:default-folder-opened"
               : "vscode-icons:default-folder"
           }
           width="16"
+          style={{ marginRight: 4 }}
         />
         <span>{node.name}</span>
 

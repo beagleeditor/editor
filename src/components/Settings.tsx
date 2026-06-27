@@ -19,6 +19,8 @@ export default function SettingsPage({ settings, update }: Props) {
       <div className="search-title">SETTINGS</div>
 
       <div className="settings-content">
+        <div className="settings-section">Editor</div>
+
         {/* THEME */}
         <div className="setting-item">
           <label>Theme</label>
@@ -41,6 +43,104 @@ export default function SettingsPage({ settings, update }: Props) {
             type="number"
             value={settings.fontSize}
             onChange={(e) => update("fontSize", Number(e.target.value))}
+          />
+        </div>
+
+        {/* FONT FAMILY */}
+        <div className="setting-item">
+          <label>Font Family</label>
+          <input
+            type="text"
+            value={settings.fontFamily}
+            onChange={(e) => update("fontFamily", e.target.value)}
+          />
+        </div>
+
+        {/* LINE HEIGHT */}
+        <div className="setting-item">
+          <label>Line Height</label>
+          <input
+            type="number"
+            value={settings.lineHeight}
+            onChange={(e) => update("lineHeight", Number(e.target.value))}
+          />
+        </div>
+
+        {/* LINE NUMBERS */}
+        <div className="setting-item">
+          <label>Line Numbers</label>
+          <select
+            value={settings.lineNumbers}
+            onChange={(e) =>
+              update("lineNumbers", e.target.value as Settings["lineNumbers"])
+            }
+          >
+            <option value="on">On</option>
+            <option value="relative">Relative</option>
+            <option value="off">Off</option>
+          </select>
+        </div>
+
+        {/* RENDER WHITESPACE */}
+        <div className="setting-item">
+          <label>Render Whitespace</label>
+          <input
+            type="checkbox"
+            checked={settings.renderWhitespace}
+            onChange={(e) => update("renderWhitespace", e.target.checked)}
+          />
+        </div>
+
+        {/* HIGHLIGHT CURRENT LINE */}
+        <div className="setting-item">
+          <label>Highlight Current Line</label>
+          <input
+            type="checkbox"
+            checked={settings.highlightCurrentLine}
+            onChange={(e) => update("highlightCurrentLine", e.target.checked)}
+          />
+        </div>
+
+        {/* CURSOR STYLE */}
+        <div className="setting-item">
+          <label>Cursor Style</label>
+          <select
+            value={settings.cursorStyle}
+            onChange={(e) =>
+              update("cursorStyle", e.target.value as Settings["cursorStyle"])
+            }
+          >
+            <option value="line">Line</option>
+            <option value="block">Block</option>
+            <option value="underline">Underline</option>
+          </select>
+        </div>
+
+        {/* CURSOR BLINKING */}
+        <div className="setting-item">
+          <label>Cursor Blinking</label>
+          <select
+            value={settings.cursorBlinking}
+            onChange={(e) =>
+              update("cursorBlinking", e.target.value as Settings["cursorBlinking"])
+            }
+          >
+            <option value="smooth">Smooth</option>
+            <option value="blink">Blink</option>
+            <option value="solid">Solid</option>
+            <option value="expand">Expand</option>
+          </select>
+        </div>
+
+        {/* SMOOTH CARET ANIMATION */}
+        <div className="setting-item">
+          <label>Smooth Caret Animation</label>
+          <input
+            type="checkbox"
+            checked={settings.cursorSmoothCaretAnimation}
+            onChange={(e) =>
+              update("cursorSmoothCaretAnimation", e.target.checked as Settings["cursorSmoothCaretAnimation"])
+            }
           />
         </div>
 

@@ -5,6 +5,10 @@ type Props = {
   encoding: string;
   lineEnding: string;
   onLanguageChange: (language: string) => void;
+  line: number;
+  column: number;
+  tabSize: number;
+  insertSpaces: boolean;
 };
 
 export default function StatusBar({
@@ -12,6 +16,10 @@ export default function StatusBar({
   encoding,
   lineEnding,
   onLanguageChange,
+  line,
+  column,
+  tabSize,
+  insertSpaces,
 }: Props) {
   const languages = monaco.languages
     .getLanguages()
@@ -20,9 +28,12 @@ export default function StatusBar({
 
   return (
     <footer className="status-bar">
-      <div className="status-left">BeagleEditor</div>
+      <div className="status-left">
+        <span>{`Ln ${line}, Col ${column}`}</span>
+      </div>
 
       <div className="status-right">
+        <span>{insertSpaces ? `Spaces: ${tabSize}` : `Tabs: ${tabSize}`}</span>
         <span>{encoding}</span>
 
         <span>{lineEnding}</span>

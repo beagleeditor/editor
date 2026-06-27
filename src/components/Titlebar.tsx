@@ -11,6 +11,7 @@ export default function TitleBar({ theme, query, onQueryChange, onOpenQuickOpen 
   return (
     <div className={`titlebar theme-${theme}`} data-tauri-drag-region>
       <input
+        data-tauri-drag-region={false}
         className="titlebar-search"
         placeholder="Quick Open..."
         value={query}
