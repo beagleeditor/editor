@@ -14,7 +14,7 @@ type Props = {
   activeTabId: string | null;
   onSelect: (id: string) => void;
   onNewTab: () => void;
-  onClose: (tab: Tab) => void; // 👈 IMPORTANT CHANGE
+  onClose: (tab: Tab) => void;
 };
 
 export default function EditorTabs({

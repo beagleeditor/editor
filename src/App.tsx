@@ -34,6 +34,62 @@ export type Theme = "dark" | "light" | "system";
 
 loader.config({ monaco });
 
+monaco.editor.defineTheme("beagle-dark", {
+  base: "vs-dark",
+  inherit: true,
+  rules: [],
+  colors: {
+    "editor.background": "#080808",
+    "editor.foreground": "#d4d4d4",
+    "editorLineNumber.foreground": "#4b5563",
+    "editorLineNumber.activeForeground": "#d4d4d4",
+    "editorCursor.foreground": "#60a5fa",
+    "editor.selectionBackground": "#264f78",
+    "editor.inactiveSelectionBackground": "#3a3d41",
+    "editor.lineHighlightBackground": "#111111",
+    "editor.lineHighlightBorder": "#1f2937",
+    "editorLineNumber.background": "#080808",
+    "editorIndentGuide.background": "#313131",
+    "editorIndentGuide.activeBackground": "#4b5563",
+    "editorWhitespace.foreground": "#3f3f46",
+    "editorBracketMatch.background": "#33415555",
+    "editorBracketMatch.border": "#60a5fa",
+    "editorGutter.background": "#080808",
+    "editorOverviewRuler.border": "#00000000",
+    "editor.findMatchBackground": "#2563eb66",
+    "editor.findMatchHighlightBackground": "#2563eb33",
+
+    "editorHoverWidget.background": "#111111",
+    "editorHoverWidget.border": "#262626",
+
+    "editorSuggestWidget.background": "#111111",
+    "editorSuggestWidget.border": "#262626",
+    "editorSuggestWidget.selectedBackground": "#1f2937",
+
+    "editorWidget.background": "#111111",
+  },
+});
+
+monaco.editor.defineTheme("beagle-light", {
+  base: "vs",
+  inherit: true,
+  rules: [],
+  colors: {
+    "editor.background": "#ffffff",
+    "editor.foreground": "#24292f",
+    "editorLineNumber.foreground": "#8c959f",
+    "editorLineNumber.activeForeground": "#24292f",
+    "editorCursor.foreground": "#0969da",
+    "editor.selectionBackground": "#b6d6ff",
+    "editor.inactiveSelectionBackground": "#dbeafe",
+    "editor.lineHighlightBackground": "#f3f4f6",
+    "editor.lineHighlightBorder": "#d1d5db",
+    "editorGutter.background": "#ffffff",
+    "editorIndentGuide.background": "#e5e7eb",
+    "editorIndentGuide.activeBackground": "#cbd5e1"
+  },
+});
+
 type FileNode = {
   name: string;
   path: string;
@@ -329,7 +385,15 @@ export default function App() {
 
     setTabs((prev) =>
       prev.map((t) =>
-        t.id === activeTab.id ? { ...t, path, dirty: false } : t,
+        t.id === activeTab.id
+          ? {
+              ...t,
+              path,
+              name: path.split(/[/\\]/).pop() ?? t.name,
+              language: detectLanguage(path.split(/[/\\]/).pop() ?? t.name),
+              dirty: false,
+            }
+          : t,
       ),
     );
   }, [activeTab]);
@@ -862,7 +926,7 @@ export default function App() {
                     ]);
                   });
                 }}
-                theme={theme === "dark" ? "vs-dark" : "vs"}
+                theme={theme === "dark" ? "beagle-dark" : "beagle-light"}
                 options={{
                   automaticLayout: true,
                   minimap: {
