@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import * as monaco from "monaco-editor";
 import { Editor, loader } from "@monaco-editor/react";
 
@@ -207,8 +209,39 @@ export default function App() {
   const startWidth = useRef(0);
 
   const editorRef = useRef<any>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
   const didValidateRef = useRef(false);
   const hydratedRef = useRef(false);
+  // ----------- Markdown Scroll Sync -----------
+  const syncEditorScroll = (editor: any) => {
+    if (!previewRef.current) return;
+
+    const editorScrollTop = editor.getScrollTop();
+    const editorScrollHeight = editor.getScrollHeight();
+    const editorClientHeight = editor.getDomNode()?.clientHeight ?? 1;
+
+    const ratio = editorScrollTop / Math.max(1, editorScrollHeight - editorClientHeight);
+
+    const preview = previewRef.current;
+    const previewScrollHeight = preview.scrollHeight;
+    const previewClientHeight = preview.clientHeight;
+
+    preview.scrollTop = ratio * Math.max(1, previewScrollHeight - previewClientHeight);
+  };
+
+  const syncPreviewScroll = () => {
+    if (!editorRef.current || !previewRef.current) return;
+
+    const preview = previewRef.current;
+    const editor = editorRef.current;
+
+    const ratio = preview.scrollTop / Math.max(1, preview.scrollHeight - preview.clientHeight);
+
+    const editorScrollHeight = editor.getScrollHeight();
+    const editorClientHeight = editor.getDomNode()?.clientHeight ?? 1;
+
+    editor.setScrollTop(ratio * Math.max(1, editorScrollHeight - editorClientHeight));
+  };
 
   const [showAbout, setShowAbout] = useState(false);
 
@@ -224,6 +257,7 @@ export default function App() {
   const [quickOpenQuery, setQuickOpenQuery] = useState("");
   const [line, setLine] = useState(1);
   const [column, setColumn] = useState(1);
+  const [previewMode, setPreviewMode] = useState<"edit" | "preview" | "split">("edit");
 
   /* ---------------- SETTINGS STORE ---------------- */
 
@@ -255,6 +289,7 @@ export default function App() {
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
+  const isMarkdown = activeTab?.language === "markdown";
 
   /* =======================================================
      FILE ACTIONS
@@ -502,6 +537,16 @@ export default function App() {
       cursorSmoothCaretAnimation: settings.cursorSmoothCaretAnimation ? "on" : "off",
     });
   }, [settings]);
+  
+  useEffect(() => {
+    if (!activeTab) return;
+
+    if (activeTab.language === "markdown") {
+      setPreviewMode("split"); // or "preview"
+    } else {
+      setPreviewMode("edit");
+    }
+  }, [activeTabId]);
 
   /* =======================================================
      MENU EVENTS
@@ -876,6 +921,75 @@ export default function App() {
                 onNewFile={newFile}
                 onOpenFolder={openFolder}
               />
+            ) : isMarkdown && previewMode !== "edit" ? (
+              <div
+                className="markdown-split"
+                style={{ display: "flex", height: "100%" }}
+              >
+                {isMarkdown &&
+                  (previewMode === "preview" || previewMode === "split") && (
+                    <div style={{ flex: 1 }}>
+                      <Editor
+                        key={`${settings?.theme}-${settings?.fontSize}`}
+                        language={activeTab?.language ?? "plaintext"}
+                        value={activeTab?.content ?? ""}
+                        onChange={updateContent}
+                        onMount={(editor, monaco) => {
+                          editorRef.current = editor;
+
+                          const pos = editor.getPosition();
+                          setLine(pos?.lineNumber ?? 1);
+                          setColumn(pos?.column ?? 1);
+
+                          editor.onDidChangeCursorPosition((e) => {
+                            setLine(e.position.lineNumber);
+                            setColumn(e.position.column);
+                          });
+
+                          editor.onDidScrollChange(() => {
+                            syncEditorScroll(editor);
+                          });
+                        }}
+                        theme={
+                          theme === "dark" ? "beagle-dark" : "beagle-light"
+                        }
+                        options={{
+                          automaticLayout: true,
+                          minimap: { enabled: settings?.minimap ?? true },
+                          scrollBeyondLastLine: false,
+                          fontSize: Math.max(10, settings?.fontSize ?? 14),
+                          fontFamily: settings?.fontFamily,
+                          lineHeight: settings?.lineHeight,
+                          lineNumbers: settings?.lineNumbers,
+                          renderWhitespace: settings?.renderWhitespace
+                            ? "all"
+                            : "none",
+                          renderLineHighlight: settings?.highlightCurrentLine
+                            ? "line"
+                            : "none",
+                          cursorStyle: settings?.cursorStyle,
+                          cursorBlinking: settings?.cursorBlinking,
+                          tabSize: settings?.tabSize ?? 2,
+                          wordWrap: settings?.wordWrap ? "on" : "off",
+                          cursorSmoothCaretAnimation:
+                            settings?.cursorSmoothCaretAnimation ? "on" : "off",
+                        }}
+                      />
+                    </div>
+                  )}
+
+                {(previewMode === "split" || previewMode === "preview") && (
+                  <div
+                    ref={previewRef}
+                    onScroll={syncPreviewScroll}
+                    style={{ flex: 1, padding: 16, overflow: "auto" }}
+                  >
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {activeTab?.content ?? ""}
+                    </ReactMarkdown>
+                  </div>
+                )}
+              </div>
             ) : (
               <Editor
                 key={`${settings?.theme}-${settings?.fontSize}`}
@@ -966,12 +1080,15 @@ export default function App() {
                   lineHeight: settings?.lineHeight,
                   lineNumbers: settings?.lineNumbers,
                   renderWhitespace: settings?.renderWhitespace ? "all" : "none",
-                  renderLineHighlight: settings?.highlightCurrentLine ? "line" : "none",
+                  renderLineHighlight: settings?.highlightCurrentLine
+                    ? "line"
+                    : "none",
                   cursorStyle: settings?.cursorStyle,
                   cursorBlinking: settings?.cursorBlinking,
                   tabSize: settings?.tabSize ?? 2,
                   wordWrap: settings?.wordWrap ? "on" : "off",
-                  cursorSmoothCaretAnimation: settings?.cursorSmoothCaretAnimation ? "on" : "off",
+                  cursorSmoothCaretAnimation:
+                    settings?.cursorSmoothCaretAnimation ? "on" : "off",
                 }}
               />
             )}
