@@ -9,7 +9,7 @@ type Props = {
 
 export default function TitleBar({ theme, query, onQueryChange, onOpenQuickOpen }: Props) {
   return (
-    <div className={`titlebar theme-${theme}`}>
+    <div className={`titlebar theme-${theme}`} data-tauri-drag-region>
       <input
         className="titlebar-search"
         placeholder="Quick Open..."
