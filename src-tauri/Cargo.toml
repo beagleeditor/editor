@@ -1,6 +1,6 @@
 [package]
 name = "beagleeditor"
-version = "26.1.0"
+version = "26.2.0"
 description = "A 'beagleful' editor"
 authors = ["BeagleSoftware", "The contributors"]
 edition = "2021"
