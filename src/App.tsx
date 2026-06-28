@@ -88,7 +88,7 @@ monaco.editor.defineTheme("beagle-light", {
     "editor.lineHighlightBorder": "#d1d5db",
     "editorGutter.background": "#ffffff",
     "editorIndentGuide.background": "#e5e7eb",
-    "editorIndentGuide.activeBackground": "#cbd5e1"
+    "editorIndentGuide.activeBackground": "#cbd5e1",
   },
 });
 
@@ -212,6 +212,8 @@ export default function App() {
   const previewRef = useRef<HTMLDivElement>(null);
   const didValidateRef = useRef(false);
   const hydratedRef = useRef(false);
+  const openLock = useRef(false);
+  const openFolderLock = useRef(false);
   // ----------- Markdown Scroll Sync -----------
   const syncEditorScroll = (editor: any) => {
     if (!previewRef.current) return;
@@ -220,13 +222,15 @@ export default function App() {
     const editorScrollHeight = editor.getScrollHeight();
     const editorClientHeight = editor.getDomNode()?.clientHeight ?? 1;
 
-    const ratio = editorScrollTop / Math.max(1, editorScrollHeight - editorClientHeight);
+    const ratio =
+      editorScrollTop / Math.max(1, editorScrollHeight - editorClientHeight);
 
     const preview = previewRef.current;
     const previewScrollHeight = preview.scrollHeight;
     const previewClientHeight = preview.clientHeight;
 
-    preview.scrollTop = ratio * Math.max(1, previewScrollHeight - previewClientHeight);
+    preview.scrollTop =
+      ratio * Math.max(1, previewScrollHeight - previewClientHeight);
   };
 
   const syncPreviewScroll = () => {
@@ -235,12 +239,16 @@ export default function App() {
     const preview = previewRef.current;
     const editor = editorRef.current;
 
-    const ratio = preview.scrollTop / Math.max(1, preview.scrollHeight - preview.clientHeight);
+    const ratio =
+      preview.scrollTop /
+      Math.max(1, preview.scrollHeight - preview.clientHeight);
 
     const editorScrollHeight = editor.getScrollHeight();
     const editorClientHeight = editor.getDomNode()?.clientHeight ?? 1;
 
-    editor.setScrollTop(ratio * Math.max(1, editorScrollHeight - editorClientHeight));
+    editor.setScrollTop(
+      ratio * Math.max(1, editorScrollHeight - editorClientHeight),
+    );
   };
 
   const [showAbout, setShowAbout] = useState(false);
@@ -257,7 +265,9 @@ export default function App() {
   const [quickOpenQuery, setQuickOpenQuery] = useState("");
   const [line, setLine] = useState(1);
   const [column, setColumn] = useState(1);
-  const [previewMode, setPreviewMode] = useState<"edit" | "preview" | "split">("edit");
+  const [previewMode, setPreviewMode] = useState<"edit" | "preview" | "split">(
+    "edit",
+  );
 
   /* ---------------- SETTINGS STORE ---------------- */
 
@@ -351,10 +361,9 @@ export default function App() {
     } finally {
       setBooting(false);
 
-      // 💥 IMPORTANT: allow saving AFTER restore is fully applied
-      setTimeout(() => {
+      requestAnimationFrame(() => {
         hydratedRef.current = true;
-      }, 0);
+      });
     }
   }, []);
 
@@ -379,29 +388,42 @@ export default function App() {
   }, [tabs]);
 
   const openFile = useCallback(async () => {
-    const selected = await open({ multiple: false });
+    if (openLock.current) return;
 
-    if (!selected || Array.isArray(selected)) return;
+    openLock.current = true;
 
-    const text = await fsAPI.readFile(selected);
-    const name = selected.split(/[/\\]/).pop() ?? "file";
+    try {
+      const selected = await open({ multiple: false });
 
-    const id = crypto.randomUUID();
+      if (!selected || Array.isArray(selected)) return;
 
-    setTabs((prev) => [
-      ...prev,
-      {
-        id,
-        path: selected,
-        name,
-        content: text,
-        language: detectLanguage(name),
-        dirty: false,
-      },
-    ]);
+      const text = await fsAPI.readFile(selected);
+      const name = selected.split(/[/\\]/).pop() ?? "file";
 
-    setActiveTabId(id);
-    setShowWelcome(false);
+      const id = crypto.randomUUID();
+
+      setTabs((prev) => {
+        const exists = prev.find((t) => t.path === selected);
+        if (exists) return prev;
+
+        return [
+          ...prev,
+          {
+            id,
+            path: selected,
+            name,
+            content: text,
+            language: detectLanguage(name),
+            dirty: false,
+          },
+        ];
+      });
+
+      setActiveTabId(id);
+      setShowWelcome(false);
+    } finally {
+      openLock.current = false;
+    }
   }, []);
 
   const saveFile = useCallback(async () => {
@@ -449,21 +471,29 @@ export default function App() {
   };
 
   const openFolder = async () => {
-    const dir = await open({ directory: true });
+    if (openFolderLock.current) return;
 
-    if (!dir || Array.isArray(dir)) return;
+    openFolderLock.current = true;
 
-    setWorkspaceDir(dir);
-    setShowWelcome(false);
+    try {
+      const dir = await open({ directory: true });
 
-    const entries = await fsAPI.readDir(dir);
+      if (!dir || Array.isArray(dir)) return;
 
-    setFileTree({
-      name: dir.split(/[/\\]/).pop() ?? "root",
-      path: dir,
-      is_dir: true,
-      children: entries,
-    });
+      setWorkspaceDir(dir);
+      setShowWelcome(false);
+
+      const entries = await fsAPI.readDir(dir);
+
+      setFileTree({
+        name: dir.split(/[/\\]/).pop() ?? "root",
+        path: dir,
+        is_dir: true,
+        children: entries,
+      });
+    } finally {
+      openFolderLock.current = false;
+    }
   };
 
   const openFileFromExplorer = async (path: string) => {
@@ -534,10 +564,12 @@ export default function App() {
       minimap: {
         enabled: settings.minimap,
       },
-      cursorSmoothCaretAnimation: settings.cursorSmoothCaretAnimation ? "on" : "off",
+      cursorSmoothCaretAnimation: settings.cursorSmoothCaretAnimation
+        ? "on"
+        : "off",
     });
   }, [settings]);
-  
+
   useEffect(() => {
     if (!activeTab) return;
 
@@ -645,10 +677,6 @@ export default function App() {
     setCreatePath("");
 
     await reloadWorkspace();
-
-    setTimeout(() => {
-      reloadWorkspace();
-    }, 100);
   };
 
   const closeTab = (id: string) => {
@@ -705,6 +733,16 @@ export default function App() {
         return tab;
       }),
     );
+
+    useEffect(() => {
+      const onResize = () => {
+        editorRef.current?.layout?.();
+      };
+
+      window.addEventListener("resize", onResize);
+
+      return () => window.removeEventListener("resize", onResize);
+    }, []);
 
     setRenameTarget(null);
     setRenamePath("");

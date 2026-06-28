@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { fsAPI, FileNode } from "../lib/fs";
 import { Icon } from "@iconify/react";
+import { listen } from "@tauri-apps/api/event";
 
 /* -------------------------------------------------------
    TYPES
@@ -96,6 +97,23 @@ export default function Explorer({
   } | null>(null);
 
   const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    if (!onReload) return;
+
+    let unlisten: (() => void) | null = null;
+
+    (async () => {
+      unlisten = await listen("fs-changed", async () => {
+        await onReload();
+        setRefreshKey((v) => v + 1);
+      });
+    })();
+
+    return () => {
+      unlisten?.();
+    };
+  }, [onReload]);
 
   return (
     <aside className="explorer">

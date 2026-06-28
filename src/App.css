@@ -133,6 +133,13 @@ body {
   flex: 1;
 }
 
+.explorer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
 .explorer-title {
   padding: 16px;
 
@@ -146,8 +153,11 @@ body {
 }
 
 .explorer-content {
+  flex: 1;
   padding: 16px;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
 }
 
 .main {

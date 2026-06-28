@@ -2,6 +2,10 @@ use serde::Serialize;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use notify::{Watcher, RecursiveMode, recommended_watcher};
+use std::sync::mpsc::channel;
+use tauri::Emitter;
+
 /// -----------------------------------------------------
 /// FILE NODE (shared with frontend)
 /// -----------------------------------------------------
@@ -184,4 +188,28 @@ pub fn reveal_in_finder(path: String) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+fn watch_folder(app: tauri::AppHandle, path: String) {
+  std::thread::spawn(move || {
+    let (tx, rx) = channel();
+
+    let mut watcher = recommended_watcher(tx).unwrap();
+
+    watcher.watch(&path.as_ref(), RecursiveMode::Recursive).unwrap();
+
+    for res in rx {
+      match res {
+        Ok(_event) => {
+          let _ = app.emit("fs-changed", {});
+        }
+        Err(_) => {}
+      }
+    }
+  });
+}
+
+#[tauri::command]
+pub fn start_watch(app: tauri::AppHandle, path: String) {
+  watch_folder(app, path);
 }
