@@ -97,7 +97,15 @@ export async function hover(uri, line, character) {
 }
 
 export async function completion(uri, line, character) {
-  return await invoke<LspResponse>("lsp_completion", { uri, line, character });
+  const path = uri.startsWith("file://")
+    ? decodeURIComponent(new URL(uri).pathname)
+    : uri;
+
+  return await invoke<LspResponse>("lsp_completion", {
+    path,
+    line,
+    character,
+  });
 }
 
 export async function definition(uri, line, character) {
@@ -175,42 +183,78 @@ export function registerProviders(monaco, language) {
     },
   });
 
+  console.log("Registering completion provider for", language);
   monaco.languages.registerCompletionItemProvider(language, {
-    triggerCharacters: [".", ":", "<", '"', "'", "/", "@", "*", "#"],
+    triggerCharacters: [".", ":", "<", '"', "'", "/", "@", "*", "#", "_"],
     async provideCompletionItems(model, position) {
       const uri = model.uri.toString();
       const line = position.lineNumber - 1;
       const character = position.column - 1;
+      console.log("Completion requested", uri, line, character);
+      console.log("Completion model language:", model.getLanguageId());
       try {
         const result = await completion(uri, line, character);
-        if (result && result.result && result.result.items) {
-          return {
-            suggestions: result.result.items.map((item) => ({
-              label: item.label,
-              kind:
-                monaco.languages.CompletionItemKind[item.kind] ||
-                monaco.languages.CompletionItemKind.Text,
-              documentation: item.documentation
-                ? typeof item.documentation === "string"
-                  ? item.documentation
-                  : item.documentation.value
+        console.log("Raw completion result:", result);
+        console.log("Completion response", result);
+        const items = Array.isArray(result?.result)
+          ? result.result
+          : (result?.result?.items ?? []);
+
+        return {
+          suggestions: items.map((item) => ({
+            label: item.label,
+            kind: (() => {
+              const kinds = {
+                1: monaco.languages.CompletionItemKind.Text,
+                2: monaco.languages.CompletionItemKind.Method,
+                3: monaco.languages.CompletionItemKind.Function,
+                4: monaco.languages.CompletionItemKind.Constructor,
+                5: monaco.languages.CompletionItemKind.Field,
+                6: monaco.languages.CompletionItemKind.Variable,
+                7: monaco.languages.CompletionItemKind.Class,
+                8: monaco.languages.CompletionItemKind.Interface,
+                9: monaco.languages.CompletionItemKind.Module,
+                10: monaco.languages.CompletionItemKind.Property,
+                12: monaco.languages.CompletionItemKind.Unit,
+                13: monaco.languages.CompletionItemKind.Value,
+                14: monaco.languages.CompletionItemKind.Enum,
+                15: monaco.languages.CompletionItemKind.Keyword,
+                16: monaco.languages.CompletionItemKind.Snippet,
+                17: monaco.languages.CompletionItemKind.Color,
+                18: monaco.languages.CompletionItemKind.File,
+                19: monaco.languages.CompletionItemKind.Reference,
+                20: monaco.languages.CompletionItemKind.Folder,
+                21: monaco.languages.CompletionItemKind.EnumMember,
+                22: monaco.languages.CompletionItemKind.Constant,
+                23: monaco.languages.CompletionItemKind.Struct,
+                24: monaco.languages.CompletionItemKind.Event,
+                25: monaco.languages.CompletionItemKind.Operator,
+                26: monaco.languages.CompletionItemKind.TypeParameter,
+              };
+              return (
+                kinds[item.kind] ?? monaco.languages.CompletionItemKind.Text
+              );
+            })(),
+            documentation: item.documentation
+              ? typeof item.documentation === "string"
+                ? item.documentation
+                : item.documentation.value
+              : undefined,
+            insertText: item.insertText || item.label,
+            insertTextRules:
+              item.insertTextFormat === 2
+                ? monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet
                 : undefined,
-              insertText: item.insertText || item.label,
-              insertTextRules:
-                item.insertTextFormat === 2
-                  ? monaco.languages.CompletionItemInsertTextRule
-                      .InsertAsSnippet
-                  : undefined,
-              range: undefined,
-            })),
-          };
-        }
+            range: undefined,
+          })),
+        };
       } catch (e) {
-        // ignore errors
+        console.error("Completion request failed", e);
       }
       return { suggestions: [] };
     },
   });
+  console.log("Completion provider registered for", language);
 
   monaco.languages.registerDefinitionProvider(language, {
     async provideDefinition(model, position) {
@@ -256,6 +300,9 @@ export function attachModelSync(
   if (activeModelSyncs.has(model)) {
     return activeModelSyncs.get(model);
   }
+  if (activeModels.has(model)) {
+    return { dispose() {} };
+  }
 
   const uri = model.uri.toString();
   const path = decodeURIComponent(new URL(uri).pathname);
@@ -290,22 +337,13 @@ export function attachModelSync(
 
         if (openedForPath!.has(openKey)) return;
 
-        console.log("Waiting for LSP init:", backendLang);
-        const ready = await waitForInitialization(backendLang);
-        console.log("LSP init status:", { backendLang, ready });
-        if (!ready) {
-          console.warn(
-            `LSP not initialized in time for ${backendLang}; forcing didOpen for ${path}`,
-          );
-        }
-
         console.log(`Sending didOpen for ${path} via ${backend}`);
-        console.log("OPENING LSP DOCUMENT:", {
-          path,
-          backendLang,
-        });
-        await openDocument(path, backendLang, model.getValue());
-        openedForPath!.add(openKey);
+        try {
+          await openDocument(path, backendLang, model.getValue());
+          openedForPath!.add(openKey);
+        } catch (err) {
+          console.error(`didOpen failed for ${path}`, err);
+        }
       }),
     );
   });

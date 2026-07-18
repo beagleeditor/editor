@@ -12,6 +12,9 @@ use std::path::Path;
 static INITIALIZED_LANGUAGES: std::sync::LazyLock<std::sync::Mutex<HashSet<String>>> =
     std::sync::LazyLock::new(|| std::sync::Mutex::new(HashSet::new()));
 
+static OPEN_DOCUMENTS: std::sync::LazyLock<std::sync::Mutex<HashSet<String>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(HashSet::new()));
+
 #[tauri::command]
 pub fn lsp_start(app: tauri::AppHandle, language: String) -> Result<(), String> {
     println!("lsp_start(language={})", language);
@@ -111,6 +114,8 @@ pub fn lsp_stop(language: String) {
         initialized.remove(&language);
     }
 
+    OPEN_DOCUMENTS.lock().unwrap().clear();
+
     let mut manager = LSP_MANAGER.lock().unwrap();
     manager.stop(&language);
 }
@@ -123,6 +128,14 @@ pub fn lsp_is_initialized(language: String) -> bool {
 #[tauri::command]
 pub fn lsp_open(path: String, language: String, text: String) {
     println!("lsp_open(path={})", path);
+
+    {
+        let mut open_docs = OPEN_DOCUMENTS.lock().unwrap();
+        if open_docs.contains(&path) {
+            return;
+        }
+        open_docs.insert(path.clone());
+    }
 
     let client_ptr: *mut LspClient = {
         let mut manager = LSP_MANAGER.lock().unwrap();
@@ -186,5 +199,27 @@ pub fn lsp_save(path: String) {
     unsafe {
         let client = &mut *client_ptr;
         let _ = client.did_save(&path);
+    }
+}
+
+#[tauri::command]
+pub fn lsp_completion(
+    path: String,
+    line: u32,
+    character: u32,
+) -> Result<serde_json::Value, String> {
+    let client_ptr: *mut LspClient = {
+        let mut manager = LSP_MANAGER.lock().unwrap();
+        match manager.client_for_path_mut(&path) {
+            Some(client) => client as *mut LspClient,
+            None => return Err("No LSP client for file".into()),
+        }
+    };
+
+    unsafe {
+        let client = &mut *client_ptr;
+        client
+            .completion(&path, line, character)
+            .map_err(|e| e.to_string())
     }
 }

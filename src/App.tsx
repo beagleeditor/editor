@@ -605,13 +605,7 @@ export default function App() {
     activeModelRef.current = model;
 
     if (model && activeTab?.language) {
-      const attach = () => {
-        void attachModelSync(model, activeTab.language);
-      };
-
-      attach();
-      window.setTimeout(attach, 1000);
-      window.setTimeout(attach, 3000);
+      void attachModelSync(model, activeTab.language);
     }
 
     return model;
@@ -1103,6 +1097,15 @@ export default function App() {
                           if (model && editor.getModel() !== model) {
                             editor.setModel(model);
                           }
+                          editor.onDidChangeModel(() => {
+                            const m = editor.getModel();
+                            if (m) {
+                              void attachModelSync(
+                                m,
+                                activeTab?.language ?? "plaintext",
+                              );
+                            }
+                          });
 
                           const pos = editor.getPosition();
                           setLine(pos?.lineNumber ?? 1);
@@ -1174,6 +1177,15 @@ export default function App() {
                   if (model && editor.getModel() !== model) {
                     editor.setModel(model);
                   }
+                  editor.onDidChangeModel(() => {
+                    const m = editor.getModel();
+                    if (m) {
+                      void attachModelSync(
+                        m,
+                        activeTab?.language ?? "plaintext",
+                      );
+                    }
+                  });
 
                   const pos = editor.getPosition();
                   setLine(pos?.lineNumber ?? 1);
