@@ -10,7 +10,6 @@ use tauri::Emitter;
 
 use anyhow::{anyhow, Result};
 use serde_json::json;
-use tauri::Manager;
 
 use super::transport::Transport;
 
@@ -211,6 +210,15 @@ impl LspClient {
                             }
                         },
                         "definition": {},
+                        "signatureHelp": {
+                            "dynamicRegistration": false,
+                            "signatureInformation": {
+                                "documentationFormat": ["markdown", "plaintext"],
+                                "parameterInformation": {
+                                    "labelOffsetSupport": true
+                                }
+                            }
+                        },
                         "references": {},
                         "rename": {
                             "prepareSupport": true
@@ -319,6 +327,12 @@ impl LspClient {
             .unwrap_or(false)
     }
 
+    pub fn supports_signature_help(&self) -> bool {
+        self.server_capabilities
+            .get("signatureHelpProvider")
+            .is_some()
+    }
+
     pub fn supports_rename(&self) -> bool {
         self.server_capabilities.get("renameProvider").is_some()
     }
@@ -368,6 +382,26 @@ impl LspClient {
             "jsonrpc": "2.0",
             "id": id,
             "method": "textDocument/definition",
+            "params": {
+                "textDocument": { "uri": uri },
+                "position": {
+                    "line": line,
+                    "character": character
+                }
+            }
+        }))
+    }
+    pub fn signature_help(&mut self, uri: &str, line: u32, character: u32) -> Result<Value> {
+        let uri = Self::file_uri(uri);
+        println!(
+            "SignatureHelp request: uri={}, line={}, character={}",
+            uri, line, character
+        );
+        let id = self.request_id();
+        self.send_request(json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "method": "textDocument/signatureHelp",
             "params": {
                 "textDocument": { "uri": uri },
                 "position": {

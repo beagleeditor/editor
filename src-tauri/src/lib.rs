@@ -13,7 +13,7 @@ use fs::{
 };
 use lsp::{
     lsp_change, lsp_completion, lsp_definition, lsp_hover, lsp_is_initialized, lsp_open, lsp_save,
-    lsp_start, lsp_stop,
+    lsp_signature_help, lsp_start, lsp_stop,
 };
 use search::search_workspace;
 
@@ -104,6 +104,7 @@ pub fn run() {
             lsp_is_initialized,
             lsp_hover,
             lsp_definition,
+            lsp_signature_help,
         ])
         .run(tauri::generate_context!())
         .expect("error while running application");

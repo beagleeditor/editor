@@ -294,6 +294,49 @@ function registerDefinitionProvider(
   });
 }
 
+function registerSignatureHelpProvider(
+  monaco: typeof import("monaco-editor"),
+  language: string,
+) {
+  monaco.languages.registerSignatureHelpProvider(language, {
+    signatureHelpTriggerCharacters: ["(", ","],
+
+    async provideSignatureHelp(model, position) {
+      try {
+        const response = await invoke<any>("lsp_signature_help", {
+          path: model.uri.fsPath,
+          line: position.lineNumber - 1,
+          character: position.column - 1,
+        });
+
+        console.log("Signature help response:", response);
+
+        const result = response.result;
+
+        if (!result || !result.signatures?.length) {
+          return null;
+        }
+
+        return {
+          value: {
+            signatures: result.signatures.map((signature: any) => ({
+              label: signature.label,
+              documentation: signature.documentation,
+              parameters: signature.parameters ?? [],
+            })),
+            activeSignature: result.activeSignature ?? 0,
+            activeParameter: result.activeParameter ?? 0,
+          },
+          dispose() {},
+        };
+      } catch (error) {
+        console.error("LSP signature help failed:", error);
+        return null;
+      }
+    },
+  });
+}
+
 /* =======================================================
    APP
 ======================================================= */
@@ -1184,6 +1227,10 @@ export default function App() {
                               monaco,
                               activeTab.language,
                             );
+                            registerSignatureHelpProvider(
+                              monaco,
+                              activeTab.language,
+                            );
                           }
                           const model = syncActiveModel();
                           if (model && editor.getModel() !== model) {
@@ -1266,6 +1313,7 @@ export default function App() {
                     registerProviders(monaco, activeTab.language);
                     registerHoverProvider(monaco, activeTab.language);
                     registerDefinitionProvider(monaco, activeTab.language);
+                    registerSignatureHelpProvider(monaco, activeTab.language);
                   }
                   const model = syncActiveModel();
                   if (model && editor.getModel() !== model) {
