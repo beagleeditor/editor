@@ -1,5 +1,6 @@
 pub mod fs;
 pub mod search;
+pub mod lsp;
 
 use tauri::{
     Emitter, menu::{Menu, MenuItem, Submenu}
@@ -7,6 +8,7 @@ use tauri::{
 
 use fs::{path_exists, read_dir, read_file, read_workspace, write_file, create_file, create_dir, delete_path, rename_path, reveal_in_finder, start_watch};
 use search::search_workspace;
+use lsp::{lsp_start, lsp_stop, lsp_open, lsp_change, lsp_save, lsp_is_initialized};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -15,12 +17,12 @@ pub fn run() {
         .setup(|app| {
             // FILE MENU
             let open = MenuItem::with_id(app, "open", "Open...", true, Some("CmdOrCtrl+O"))?;
-            let openFolder = MenuItem::with_id(app, "openfolder", "Open Folder...", true, Some("CmdOrCtrl+Shift+O"))?;
+            let openfolder = MenuItem::with_id(app, "openfolder", "Open Folder...", true, Some("CmdOrCtrl+Shift+O"))?;
             let save = MenuItem::with_id(app, "save", "Save", true, Some("CmdOrCtrl+S"))?;
             let quit =
                 MenuItem::with_id(app, "quit", "Quit BeagleEditor", true, Some("CmdOrCtrl+Q"))?;
 
-            let file_menu = Submenu::with_items(app, "File", true, &[&open, &openFolder, &save, &quit])?;
+            let file_menu = Submenu::with_items(app, "File", true, &[&open, &openfolder, &save, &quit])?;
 
             // APP INFO MENU (works everywhere, macOS just relocates it visually)
             let about = MenuItem::with_id(app, "about", "About BeagleEditor", true, None::<&str>)?;
@@ -79,6 +81,12 @@ pub fn run() {
             rename_path,
             reveal_in_finder,
             start_watch,
+            lsp_start,
+            lsp_stop,
+            lsp_open,
+            lsp_change,
+            lsp_save,
+            lsp_is_initialized,
         ])
         .run(tauri::generate_context!())
         .expect("error while running application");

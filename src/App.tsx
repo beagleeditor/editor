@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import * as monaco from "monaco-editor";
+
 import { Editor, loader } from "@monaco-editor/react";
 
 import { listen } from "@tauri-apps/api/event";
@@ -28,6 +29,12 @@ import { Tab } from "./components/EditorTabs";
 import About from "./components/About";
 import Dialog from "./components/Dialog";
 import QuickOpen from "./components/QuickOpen";
+
+import {
+  attachModelSync,
+  listenDiagnostics,
+  registerProviders,
+} from "./lib/lsp";
 
 /* ---------------- TYPES ---------------- */
 
@@ -190,6 +197,16 @@ function flattenTree(node: FileNode | null): FlatFile[] {
   return result;
 }
 
+function getModelUriForTab(tab: Tab): monaco.Uri {
+  if (tab.path) {
+    return monaco.Uri.file(tab.path);
+  }
+
+  return monaco.Uri.parse(
+    `inmemory://beagle/${tab.id}/${encodeURIComponent(tab.name)}`,
+  );
+}
+
 /* =======================================================
    APP
 ======================================================= */
@@ -210,10 +227,10 @@ export default function App() {
 
   const editorRef = useRef<any>(null);
   const previewRef = useRef<HTMLDivElement>(null);
-  const didValidateRef = useRef(false);
   const hydratedRef = useRef(false);
   const openLock = useRef(false);
   const openFolderLock = useRef(false);
+  const activeModelRef = useRef<monaco.editor.ITextModel | null>(null);
   // ----------- Markdown Scroll Sync -----------
   const syncEditorScroll = (editor: any) => {
     if (!previewRef.current) return;
@@ -254,8 +271,6 @@ export default function App() {
   const [showAbout, setShowAbout] = useState(false);
 
   const [tabToClose, setTabToClose] = useState<Tab | null>(null);
-
-  const [showQuickOpen, setShowQuickOpen] = useState(false);
 
   const [booting, setBooting] = useState(true);
 
@@ -300,6 +315,10 @@ export default function App() {
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
   const isMarkdown = activeTab?.language === "markdown";
+  const activeModelUri = useMemo(
+    () => (activeTab ? getModelUriForTab(activeTab).toString() : null),
+    [activeTab],
+  );
 
   /* =======================================================
      FILE ACTIONS
@@ -497,6 +516,13 @@ export default function App() {
   };
 
   const openFileFromExplorer = async (path: string) => {
+    const existing = tabs.find((tab) => tab.path === path);
+    if (existing) {
+      setActiveTabId(existing.id);
+      setShowWelcome(false);
+      return;
+    }
+
     const text = await fsAPI.readFile(path);
     const name = path.split(/[/\\]/).pop() ?? "file";
 
@@ -515,6 +541,7 @@ export default function App() {
     ]);
 
     setActiveTabId(id);
+    setShowWelcome(false);
   };
 
   const changeLanguage = (lang: string) => {
@@ -523,6 +550,11 @@ export default function App() {
     setTabs((prev) =>
       prev.map((t) => (t.id === activeTab.id ? { ...t, language: lang } : t)),
     );
+
+    const model = activeModelRef.current;
+    if (model) {
+      monaco.editor.setModelLanguage(model, lang);
+    }
   };
 
   const updateContent = (value?: string) => {
@@ -547,6 +579,51 @@ export default function App() {
     }
   };
 
+  const syncActiveModel = useCallback(() => {
+    if (!activeTab) {
+      activeModelRef.current = null;
+      return null;
+    }
+
+    const uri = getModelUriForTab(activeTab);
+    let model = monaco.editor.getModel(uri);
+
+    if (!model) {
+      model = monaco.editor.createModel(
+        activeTab.content,
+        activeTab.language,
+        uri,
+      );
+    } else {
+      if (model.getValue() !== activeTab.content) {
+        model.setValue(activeTab.content);
+      }
+
+      monaco.editor.setModelLanguage(model, activeTab.language);
+    }
+
+    activeModelRef.current = model;
+
+    if (model && activeTab?.language) {
+      const attach = () => {
+        void attachModelSync(model, activeTab.language);
+      };
+
+      attach();
+      window.setTimeout(attach, 1000);
+      window.setTimeout(attach, 3000);
+    }
+
+    return model;
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (!activeTab) return;
+
+    const model = syncActiveModel();
+    if (!model) return;
+  }, [activeTab, syncActiveModel]);
+
   useEffect(() => {
     if (!editorRef.current || !settings) return;
 
@@ -569,6 +646,50 @@ export default function App() {
         : "off",
     });
   }, [settings]);
+
+  useEffect(() => {
+    const setup = async () => {
+      const dispose = await listenDiagnostics((payload) => {
+        const uri = monaco.Uri.parse(payload.uri);
+        const model = monaco.editor.getModel(uri);
+
+        if (!model) {
+          console.warn("LSP diagnostics: no Monaco model for", payload.uri);
+          return;
+        }
+
+        monaco.editor.setModelMarkers(
+          model,
+          "lsp",
+          (payload.diagnostics ?? []).map((diagnostic: any) => ({
+            startLineNumber: diagnostic.range.start.line + 1,
+            startColumn: diagnostic.range.start.character + 1,
+            endLineNumber: diagnostic.range.end.line + 1,
+            endColumn: diagnostic.range.end.character + 1,
+            message: diagnostic.message,
+            severity:
+              diagnostic.severity === 1
+                ? monaco.MarkerSeverity.Error
+                : diagnostic.severity === 2
+                  ? monaco.MarkerSeverity.Warning
+                  : monaco.MarkerSeverity.Info,
+          })),
+        );
+      });
+
+      return dispose;
+    };
+
+    let cleanup: (() => void) | undefined;
+
+    void setup().then((dispose) => {
+      cleanup = dispose;
+    });
+
+    return () => {
+      cleanup?.();
+    };
+  }, []);
 
   useEffect(() => {
     if (!activeTab) return;
@@ -636,10 +757,19 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const onResize = () => {
+      editorRef.current?.layout?.();
+    };
+
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "p") {
         e.preventDefault();
-        setShowQuickOpen(true);
+        setQuickOpenVisible(true);
       }
     };
 
@@ -733,16 +863,6 @@ export default function App() {
         return tab;
       }),
     );
-
-    useEffect(() => {
-      const onResize = () => {
-        editorRef.current?.layout?.();
-      };
-
-      window.addEventListener("resize", onResize);
-
-      return () => window.removeEventListener("resize", onResize);
-    }, []);
 
     setRenameTarget(null);
     setRenamePath("");
@@ -968,12 +1088,21 @@ export default function App() {
                   (previewMode === "preview" || previewMode === "split") && (
                     <div style={{ flex: 1 }}>
                       <Editor
-                        key={`${settings?.theme}-${settings?.fontSize}`}
-                        language={activeTab?.language ?? "plaintext"}
-                        value={activeTab?.content ?? ""}
+                        path={activeModelUri ?? undefined}
+                        saveViewState={true}
+                        keepCurrentModel={true}
+                        defaultLanguage={activeTab?.language ?? "plaintext"}
+                        defaultValue={activeTab?.content ?? ""}
                         onChange={updateContent}
                         onMount={(editor, monaco) => {
                           editorRef.current = editor;
+                          if (activeTab?.language) {
+                            registerProviders(monaco, activeTab.language);
+                          }
+                          const model = syncActiveModel();
+                          if (model && editor.getModel() !== model) {
+                            editor.setModel(model);
+                          }
 
                           const pos = editor.getPosition();
                           setLine(pos?.lineNumber ?? 1);
@@ -1030,12 +1159,21 @@ export default function App() {
               </div>
             ) : (
               <Editor
-                key={`${settings?.theme}-${settings?.fontSize}`}
-                language={activeTab?.language ?? "plaintext"}
-                value={activeTab?.content ?? ""}
+                path={activeModelUri ?? undefined}
+                saveViewState={true}
+                keepCurrentModel={true}
+                defaultLanguage={activeTab?.language ?? "plaintext"}
+                defaultValue={activeTab?.content ?? ""}
                 onChange={updateContent}
                 onMount={(editor, monaco) => {
                   editorRef.current = editor;
+                  if (activeTab?.language) {
+                    registerProviders(monaco, activeTab.language);
+                  }
+                  const model = syncActiveModel();
+                  if (model && editor.getModel() !== model) {
+                    editor.setModel(model);
+                  }
 
                   const pos = editor.getPosition();
                   setLine(pos?.lineNumber ?? 1);
@@ -1062,14 +1200,31 @@ export default function App() {
 
                     const text = model.getValueInRange(selection);
 
-                    await navigator.clipboard.writeText(text);
+                    try {
+                      await navigator.clipboard.writeText(text);
+                    } catch {
+                      const textarea = document.createElement("textarea");
+                      textarea.value = text;
+                      textarea.style.position = "fixed";
+                      textarea.style.opacity = "0";
+                      document.body.appendChild(textarea);
+                      textarea.select();
+                      document.execCommand("copy");
+                      textarea.remove();
+                    }
                   });
 
                   // -------------------------
                   // PASTE (Ctrl/Cmd + V)
                   // -------------------------
                   editor.addCommand(KM.CtrlCmd | KC.KeyV, async () => {
-                    const text = await navigator.clipboard.readText();
+                    let text = "";
+
+                    try {
+                      text = await navigator.clipboard.readText();
+                    } catch {
+                      return;
+                    }
 
                     editor.executeEdits("clipboard", [
                       {
@@ -1091,7 +1246,18 @@ export default function App() {
 
                     const text = model.getValueInRange(selection);
 
-                    await navigator.clipboard.writeText(text);
+                    try {
+                      await navigator.clipboard.writeText(text);
+                    } catch {
+                      const textarea = document.createElement("textarea");
+                      textarea.value = text;
+                      textarea.style.position = "fixed";
+                      textarea.style.opacity = "0";
+                      document.body.appendChild(textarea);
+                      textarea.select();
+                      document.execCommand("copy");
+                      textarea.remove();
+                    }
 
                     editor.executeEdits("cut", [
                       {
