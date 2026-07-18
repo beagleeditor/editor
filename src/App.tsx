@@ -10,6 +10,7 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import { fsAPI } from "./lib/fs";
 import { homeDir } from "@tauri-apps/api/path";
 import { Store } from "@tauri-apps/plugin-store";
+import { invoke } from "@tauri-apps/api/core";
 
 import ActivityBar from "./components/ActivityBar";
 import Explorer from "./components/Explorer";
@@ -205,6 +206,92 @@ function getModelUriForTab(tab: Tab): monaco.Uri {
   return monaco.Uri.parse(
     `inmemory://beagle/${tab.id}/${encodeURIComponent(tab.name)}`,
   );
+}
+
+function registerHoverProvider(
+  monaco: typeof import("monaco-editor"),
+  language: string,
+) {
+  monaco.languages.registerHoverProvider(language, {
+    async provideHover(model, position) {
+      try {
+        const response = await invoke<any>("lsp_hover", {
+          path: model.uri.fsPath,
+          line: position.lineNumber - 1,
+          character: position.column - 1,
+        });
+
+        const result = response.result;
+
+        if (!result || !result.contents) {
+          return null;
+        }
+
+        const contents = Array.isArray(result.contents)
+          ? result.contents
+          : [result.contents];
+
+        return {
+          contents: contents.map((item: any) => {
+            if (typeof item === "string") {
+              return { value: item };
+            }
+
+            if (item.language && item.value) {
+              return {
+                value: `\`\`\`${item.language}\n${item.value}\n\`\`\``,
+              };
+            }
+
+            return {
+              value: item.value ?? "",
+            };
+          }),
+        };
+      } catch (error) {
+        console.error("LSP hover failed:", error);
+        return null;
+      }
+    },
+  });
+}
+
+function registerDefinitionProvider(
+  monaco: typeof import("monaco-editor"),
+  language: string,
+) {
+  monaco.languages.registerDefinitionProvider(language, {
+    async provideDefinition(model, position) {
+      try {
+        const response = await invoke<any>("lsp_definition", {
+          path: model.uri.fsPath,
+          line: position.lineNumber - 1,
+          character: position.column - 1,
+        });
+
+        const result = response.result;
+
+        if (!result) {
+          return null;
+        }
+
+        const locations = Array.isArray(result) ? result : [result];
+
+        return locations.map((location: any) => ({
+          uri: monaco.Uri.parse(location.uri),
+          range: {
+            startLineNumber: location.range.start.line + 1,
+            startColumn: location.range.start.character + 1,
+            endLineNumber: location.range.end.line + 1,
+            endColumn: location.range.end.character + 1,
+          },
+        }));
+      } catch (error) {
+        console.error("LSP definition failed:", error);
+        return null;
+      }
+    },
+  });
 }
 
 /* =======================================================
@@ -1092,6 +1179,11 @@ export default function App() {
                           editorRef.current = editor;
                           if (activeTab?.language) {
                             registerProviders(monaco, activeTab.language);
+                            registerHoverProvider(monaco, activeTab.language);
+                            registerDefinitionProvider(
+                              monaco,
+                              activeTab.language,
+                            );
                           }
                           const model = syncActiveModel();
                           if (model && editor.getModel() !== model) {
@@ -1172,6 +1264,8 @@ export default function App() {
                   editorRef.current = editor;
                   if (activeTab?.language) {
                     registerProviders(monaco, activeTab.language);
+                    registerHoverProvider(monaco, activeTab.language);
+                    registerDefinitionProvider(monaco, activeTab.language);
                   }
                   const model = syncActiveModel();
                   if (model && editor.getModel() !== model) {

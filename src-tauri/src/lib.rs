@@ -12,7 +12,8 @@ use fs::{
     rename_path, reveal_in_finder, start_watch, write_file,
 };
 use lsp::{
-    lsp_change, lsp_completion, lsp_is_initialized, lsp_open, lsp_save, lsp_start, lsp_stop,
+    lsp_change, lsp_completion, lsp_definition, lsp_hover, lsp_is_initialized, lsp_open, lsp_save,
+    lsp_start, lsp_stop,
 };
 use search::search_workspace;
 
@@ -101,6 +102,8 @@ pub fn run() {
             lsp_save,
             lsp_completion,
             lsp_is_initialized,
+            lsp_hover,
+            lsp_definition,
         ])
         .run(tauri::generate_context!())
         .expect("error while running application");

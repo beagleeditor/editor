@@ -223,3 +223,43 @@ pub fn lsp_completion(
             .map_err(|e| e.to_string())
     }
 }
+
+#[tauri::command]
+pub fn lsp_hover(path: String, line: u32, character: u32) -> Result<serde_json::Value, String> {
+    let client_ptr: *mut LspClient = {
+        let mut manager = LSP_MANAGER.lock().unwrap();
+        match manager.client_for_path_mut(&path) {
+            Some(client) => client as *mut LspClient,
+            None => return Err("No LSP client for file".into()),
+        }
+    };
+
+    unsafe {
+        let client = &mut *client_ptr;
+        client
+            .hover(&path, line, character)
+            .map_err(|e| e.to_string())
+    }
+}
+
+#[tauri::command]
+pub fn lsp_definition(
+    path: String,
+    line: u32,
+    character: u32,
+) -> Result<serde_json::Value, String> {
+    let client_ptr: *mut LspClient = {
+        let mut manager = LSP_MANAGER.lock().unwrap();
+        match manager.client_for_path_mut(&path) {
+            Some(client) => client as *mut LspClient,
+            None => return Err("No LSP client for file".into()),
+        }
+    };
+
+    unsafe {
+        let client = &mut *client_ptr;
+        client
+            .definition(&path, line, character)
+            .map_err(|e| e.to_string())
+    }
+}
