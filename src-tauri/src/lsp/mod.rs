@@ -6,129 +6,165 @@ mod transport;
 
 use client::LspClient;
 use manager::LSP_MANAGER;
-use std::collections::HashSet;
+
+use serde_json::Value;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
+use std::sync::{LazyLock, Mutex};
 
-static INITIALIZED_LANGUAGES: std::sync::LazyLock<std::sync::Mutex<HashSet<String>>> =
-    std::sync::LazyLock::new(|| std::sync::Mutex::new(HashSet::new()));
+static INITIALIZED_LANGUAGES: LazyLock<Mutex<HashSet<String>>> =
+    LazyLock::new(|| Mutex::new(HashSet::new()));
 
-static OPEN_DOCUMENTS: std::sync::LazyLock<std::sync::Mutex<HashSet<String>>> =
-    std::sync::LazyLock::new(|| std::sync::Mutex::new(HashSet::new()));
+static OPEN_DOCUMENTS: LazyLock<Mutex<HashSet<String>>> =
+    LazyLock::new(|| Mutex::new(HashSet::new()));
 
-#[tauri::command]
-pub fn lsp_start(app: tauri::AppHandle, language: String) -> Result<(), String> {
-    println!("lsp_start(language={})", language);
+static WORKSPACES: LazyLock<Mutex<HashMap<String, String>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
+static WORKSPACE_ROOT: std::sync::LazyLock<std::sync::Mutex<Option<String>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(None));
+
+fn workspace_root() -> String {
     let cwd = std::env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf());
 
-    let workspace_path = if cwd.file_name().and_then(|n| n.to_str()) == Some("src-tauri") {
+    let path = if cwd.file_name().and_then(|x| x.to_str()) == Some("src-tauri") {
         cwd.parent().unwrap_or(&cwd).to_path_buf()
     } else {
         cwd
     };
 
-    let workspace = workspace_path.to_string_lossy().to_string();
+    path.to_string_lossy().to_string()
+}
+
+#[tauri::command]
+pub fn set_workspace(path: String) {
+    println!("Workspace changed: {}", path);
+
+    let mut workspace = WORKSPACE_ROOT.lock().unwrap();
+    *workspace = Some(path);
+}
+
+#[tauri::command]
+pub fn lsp_start(app: tauri::AppHandle, language: String) -> Result<(), String> {
+    println!("lsp_start(language={})", language);
+
+    let workspace = {
+        let workspace = WORKSPACE_ROOT.lock().unwrap();
+
+        workspace.clone().unwrap_or_else(|| {
+            std::env::current_dir()
+                .unwrap_or_else(|_| Path::new(".").to_path_buf())
+                .to_string_lossy()
+                .to_string()
+        })
+    };
+
+    println!("Using workspace: {}", workspace);
 
     {
         let mut manager = LSP_MANAGER.lock().unwrap();
 
-        let start_result = match language.as_str() {
+        let result = match language.as_str() {
             "rust" => manager.start(app.clone(), language.clone(), "rust-analyzer", &[]),
-            "c" | "cpp" => manager.start(app.clone(), language.clone(), "clangd", &[]),
+
             "python" => manager.start(
                 app.clone(),
                 language.clone(),
                 "pyright-langserver",
                 &["--stdio"],
             ),
-            "javascript" | "typescript" => manager.start(
+
+            "typescript" | "javascript" => manager.start(
                 app.clone(),
                 language.clone(),
                 "typescript-language-server",
                 &["--stdio"],
             ),
+
             "go" => manager.start(app.clone(), language.clone(), "gopls", &[]),
-            "lua" => manager.start(app.clone(), language.clone(), "lua-language-server", &[]),
-            "php" => manager.start(app.clone(), language.clone(), "intelephense", &["--stdio"]),
-            "ruby" => manager.start(app.clone(), language.clone(), "ruby-lsp", &[]),
-            "csharp" => manager.start(app.clone(), language.clone(), "OmniSharp", &["--languageserver"]),
+
+            "c" | "cpp" => manager.start(app.clone(), language.clone(), "clangd", &[]),
+
+            "java" => manager.start(app.clone(), language.clone(), "jdtls", &[]),
+
             "kotlin" => manager.start(app.clone(), language.clone(), "kotlin-language-server", &[]),
+
+            "ruby" => manager.start(app.clone(), language.clone(), "ruby-lsp", &[]),
+
+            "lua" => manager.start(app.clone(), language.clone(), "lua-language-server", &[]),
+
+            "php" => manager.start(app.clone(), language.clone(), "intelephense", &["--stdio"]),
+
+            "csharp" => manager.start(
+                app.clone(),
+                language.clone(),
+                "OmniSharp",
+                &["--languageserver"],
+            ),
+
             "swift" => manager.start(app.clone(), language.clone(), "sourcekit-lsp", &[]),
+
             "html" => manager.start(
                 app.clone(),
                 language.clone(),
                 "vscode-html-language-server",
                 &["--stdio"],
             ),
+
             "css" => manager.start(
                 app.clone(),
                 language.clone(),
                 "vscode-css-language-server",
                 &["--stdio"],
             ),
+
             "json" => manager.start(
                 app.clone(),
                 language.clone(),
                 "vscode-json-language-server",
                 &["--stdio"],
             ),
-            "yaml" => manager.start(app.clone(), language.clone(), "yaml-language-server", &["--stdio"]),
-            _ => return Err("Unsupported language".into()),
+
+            "yaml" => manager.start(
+                app.clone(),
+                language.clone(),
+                "yaml-language-server",
+                &["--stdio"],
+            ),
+
+            _ => return Err(format!("Unsupported language: {}", language)),
         };
 
-        match start_result {
-            Ok(()) => println!("manager.start() succeeded for {}", language),
-            Err(err) => {
-                eprintln!("manager.start() failed for {}: {err:?}", language);
-                return Err(err.to_string());
-            }
-        }
+        result.map_err(|e| {
+            eprintln!("Failed starting {}: {:?}", language, e);
+            e.to_string()
+        })?;
     }
+
     {
         let initialized = INITIALIZED_LANGUAGES.lock().unwrap();
+
         if initialized.contains(&language) {
-            println!(
-                "LSP already initialized for {}, skipping background init",
-                language
-            );
+            println!("{} already initialized", language);
             return Ok(());
         }
     }
 
     let language_for_thread = language.clone();
-    std::thread::spawn(move || {
-        println!("Background init for {}", language_for_thread);
+    let workspace_for_thread = workspace.clone();
 
-        let client_ptr: *mut LspClient = {
-            let mut manager = LSP_MANAGER.lock().unwrap();
-            match manager.get_client_mut(&language_for_thread) {
-                Some(client) => client as *mut LspClient,
-                None => {
-                    eprintln!("get_client_mut({}) returned None", language_for_thread);
-                    return;
-                }
-            }
-        };
+    let mut manager = LSP_MANAGER.lock().unwrap();
 
-        println!("Initializing client for {}", language_for_thread);
-        unsafe {
-            let client = &mut *client_ptr;
-            if let Err(err) = client.initialize(&workspace) {
-                eprintln!("initialize() failed for {}: {err}", language_for_thread);
-                return;
-            }
-            println!("initialize() succeeded for {}", language_for_thread);
-            if let Err(err) = client.initialized() {
-                eprintln!("initialized() failed for {}: {err}", language_for_thread);
-                return;
-            }
-            {
-                let mut initialized = INITIALIZED_LANGUAGES.lock().unwrap();
-                initialized.insert(language_for_thread.clone());
-            }
-            println!("initialized() sent for {}", language_for_thread);
-        }
-    });
+    let client = manager.get_client_mut(&language).ok_or("No client")?;
+
+    client.initialize(&workspace).map_err(|e| e.to_string())?;
+
+    client.initialized().map_err(|e| e.to_string())?;
+
+    INITIALIZED_LANGUAGES
+        .lock()
+        .unwrap()
+        .insert(language.clone());
 
     Ok(())
 }
@@ -151,6 +187,7 @@ pub fn lsp_is_initialized(language: String) -> bool {
     let initialized = INITIALIZED_LANGUAGES.lock().unwrap();
     initialized.contains(&language)
 }
+
 #[tauri::command]
 pub fn lsp_open(path: String, language: String, text: String) {
     println!("lsp_open(path={})", path);
@@ -158,6 +195,7 @@ pub fn lsp_open(path: String, language: String, text: String) {
     {
         let mut open_docs = OPEN_DOCUMENTS.lock().unwrap();
         if open_docs.contains(&path) {
+            println!("Document already opened: {}", path);
             return;
         }
         open_docs.insert(path.clone());
@@ -165,27 +203,23 @@ pub fn lsp_open(path: String, language: String, text: String) {
 
     let client_ptr: *mut LspClient = {
         let mut manager = LSP_MANAGER.lock().unwrap();
+
         manager.associate_path(&path, &language);
+
         match manager.get_client_mut(&language) {
             Some(client) => client as *mut LspClient,
             None => {
-                eprintln!("No LSP client found for language: {}", language);
+                eprintln!("No LSP client found for {}", language);
                 return;
             }
         }
     };
 
-    println!("About to call client.did_open");
     unsafe {
         let client = &mut *client_ptr;
-        println!("Entering client.did_open");
-        let result = client.did_open(&path, &language, 1, &text);
-        println!("Returned from client.did_open");
 
-        if let Err(err) = result {
+        if let Err(err) = client.did_open(&path, &language, 1, &text) {
             eprintln!("did_open failed: {err}");
-        } else {
-            println!("did_open sent successfully");
         }
     }
 }
@@ -196,16 +230,22 @@ pub fn lsp_change(path: String, text: String) {
 
     let client_ptr: *mut LspClient = {
         let mut manager = LSP_MANAGER.lock().unwrap();
+
         match manager.client_for_path_mut(&path) {
             Some(client) => client as *mut LspClient,
-            None => return,
+            None => {
+                eprintln!("No client for {}", path);
+                return;
+            }
         }
     };
 
-    println!("Forwarding didChange to LSP client");
     unsafe {
         let client = &mut *client_ptr;
-        let _ = client.did_change(&path, 0, &text);
+
+        if let Err(err) = client.did_change(&path, 0, &text) {
+            eprintln!("did_change failed: {err}");
+        }
     }
 }
 
@@ -215,23 +255,27 @@ pub fn lsp_save(path: String) {
 
     let client_ptr: *mut LspClient = {
         let mut manager = LSP_MANAGER.lock().unwrap();
+
         match manager.client_for_path_mut(&path) {
             Some(client) => client as *mut LspClient,
             None => return,
         }
     };
 
-    println!("Forwarding didSave to LSP client");
     unsafe {
         let client = &mut *client_ptr;
-        let _ = client.did_save(&path);
+
+        if let Err(err) = client.did_save(&path) {
+            eprintln!("did_save failed: {err}");
+        }
     }
 }
 
 #[tauri::command]
-pub fn lsp_format(path: String) -> Result<serde_json::Value, String> {
+pub fn lsp_format(path: String) -> Result<Value, String> {
     let client_ptr: *mut LspClient = {
         let mut manager = LSP_MANAGER.lock().unwrap();
+
         match manager.client_for_path_mut(&path) {
             Some(client) => client as *mut LspClient,
             None => return Err("No LSP client for file".into()),
@@ -240,18 +284,16 @@ pub fn lsp_format(path: String) -> Result<serde_json::Value, String> {
 
     unsafe {
         let client = &mut *client_ptr;
+
         client.formatting(&path).map_err(|e| e.to_string())
     }
 }
 
 #[tauri::command]
-pub fn lsp_completion(
-    path: String,
-    line: u32,
-    character: u32,
-) -> Result<serde_json::Value, String> {
+pub fn lsp_completion(path: String, line: u32, character: u32) -> Result<Value, String> {
     let client_ptr: *mut LspClient = {
         let mut manager = LSP_MANAGER.lock().unwrap();
+
         match manager.client_for_path_mut(&path) {
             Some(client) => client as *mut LspClient,
             None => return Err("No LSP client for file".into()),
@@ -260,6 +302,7 @@ pub fn lsp_completion(
 
     unsafe {
         let client = &mut *client_ptr;
+
         client
             .completion(&path, line, character)
             .map_err(|e| e.to_string())
@@ -267,9 +310,10 @@ pub fn lsp_completion(
 }
 
 #[tauri::command]
-pub fn lsp_hover(path: String, line: u32, character: u32) -> Result<serde_json::Value, String> {
+pub fn lsp_hover(path: String, line: u32, character: u32) -> Result<Value, String> {
     let client_ptr: *mut LspClient = {
         let mut manager = LSP_MANAGER.lock().unwrap();
+
         match manager.client_for_path_mut(&path) {
             Some(client) => client as *mut LspClient,
             None => return Err("No LSP client for file".into()),
@@ -278,6 +322,7 @@ pub fn lsp_hover(path: String, line: u32, character: u32) -> Result<serde_json::
 
     unsafe {
         let client = &mut *client_ptr;
+
         client
             .hover(&path, line, character)
             .map_err(|e| e.to_string())
@@ -285,13 +330,10 @@ pub fn lsp_hover(path: String, line: u32, character: u32) -> Result<serde_json::
 }
 
 #[tauri::command]
-pub fn lsp_definition(
-    path: String,
-    line: u32,
-    character: u32,
-) -> Result<serde_json::Value, String> {
+pub fn lsp_definition(path: String, line: u32, character: u32) -> Result<Value, String> {
     let client_ptr: *mut LspClient = {
         let mut manager = LSP_MANAGER.lock().unwrap();
+
         match manager.client_for_path_mut(&path) {
             Some(client) => client as *mut LspClient,
             None => return Err("No LSP client for file".into()),
@@ -300,6 +342,7 @@ pub fn lsp_definition(
 
     unsafe {
         let client = &mut *client_ptr;
+
         client
             .definition(&path, line, character)
             .map_err(|e| e.to_string())
@@ -307,13 +350,10 @@ pub fn lsp_definition(
 }
 
 #[tauri::command]
-pub fn lsp_signature_help(
-    path: String,
-    line: u32,
-    character: u32,
-) -> Result<serde_json::Value, String> {
+pub fn lsp_signature_help(path: String, line: u32, character: u32) -> Result<Value, String> {
     let client_ptr: *mut LspClient = {
         let mut manager = LSP_MANAGER.lock().unwrap();
+
         match manager.client_for_path_mut(&path) {
             Some(client) => client as *mut LspClient,
             None => return Err("No LSP client for file".into()),
@@ -322,6 +362,7 @@ pub fn lsp_signature_help(
 
     unsafe {
         let client = &mut *client_ptr;
+
         client
             .signature_help(&path, line, character)
             .map_err(|e| e.to_string())

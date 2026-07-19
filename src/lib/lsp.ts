@@ -34,7 +34,7 @@ async function startLsp(language: string): Promise<void> {
     return;
   }
 
-  await invoke("start_lsp", { language });
+  await invoke("lsp_start", { language });
 }
 
 export async function ensureLspForLanguage(language: string): Promise<void> {
