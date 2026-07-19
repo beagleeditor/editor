@@ -6,59 +6,53 @@ type LspResponse = {
   error?: any;
 };
 
-type LspBackend = "pyright";
-
-type StartState = {
-  promise: Promise<void>;
-  ready: boolean;
+const languageServers: Record<string, string> = {
+  python: "pyright",
+  rust: "rust-analyzer",
+  typescript: "typescript-language-server",
+  javascript: "typescript-language-server",
+  go: "gopls",
+  cpp: "clangd",
+  c: "clangd",
+  java: "jdtls",
+  kotlin: "kotlin-language-server",
+  ruby: "ruby-lsp",
+  lua: "lua-language-server",
 };
 
-const startedBackends = new Map<string, StartState>();
 const openedDocuments = new Map<string, Set<string>>();
 const DEFAULT_CHANGE_DEBOUNCE_MS = 200;
 const activeModelSyncs = new WeakMap<any, any>();
 const activeModels = new WeakSet<any>();
 const backendInitCache = new Map<string, Promise<void>>();
 
-export async function startLsp(language: string) {
-  return invoke("lsp_start", { language });
-}
+async function startLsp(language: string): Promise<void> {
+  const command = languageServers[language];
 
-function backendLanguage(language: string, _backend: LspBackend): string {
-  return language;
-}
+  if (!command) {
+    console.warn(`No LSP server configured for ${language}`);
+    return;
+  }
 
-async function startBackend(
-  language: string,
-  backend: LspBackend,
-): Promise<void> {
-  await invoke("lsp_start", { language: backendLanguage(language, backend) });
+  await invoke("start_lsp", { language });
 }
 
 export async function ensureLspForLanguage(language: string): Promise<void> {
   if (!language) return;
 
-  const backends: LspBackend[] = ["pyright"];
-
-  const key = `${language}:${backends.join(",")}`;
-
-  const existing = backendInitCache.get(key);
+  const existing = backendInitCache.get(language);
   if (existing) {
     return existing;
   }
 
-  const promise = (async () => {
-    await Promise.all(
-      backends.map((backend) => startBackend(language, backend)),
-    );
-  })();
+  const promise = startLsp(language);
 
-  backendInitCache.set(key, promise);
+  backendInitCache.set(language, promise);
 
   try {
     await promise;
   } catch (err) {
-    backendInitCache.delete(key);
+    backendInitCache.delete(language);
     throw err;
   }
 }
@@ -77,11 +71,6 @@ export async function openDocument(
     console.error("TAURI lsp_open failed:", error);
     throw error;
   }
-}
-
-// Helper to check if the LSP backend is initialized for a language
-async function isLspInitialized(language: string): Promise<boolean> {
-  return invoke<boolean>("lsp_is_initialized", { language });
 }
 
 export async function changeDocument(path: string, text: string) {
@@ -116,13 +105,13 @@ export async function references(uri, line, character) {
   return await invoke<LspResponse>("lsp_references", { uri, line, character });
 }
 
-export async function formatDocument(uri) {
-  return await invoke<LspResponse>("lsp_format", { uri });
+export async function formatDocument(path: string) {
+  return await invoke<LspResponse>("lsp_format", { path });
 }
 
 export function listenDiagnostics(
   callback: (payload: any) => void,
-  options?: { backend?: LspBackend | LspBackend[] },
+  options?: { backend?: string | string[] },
 ) {
   const allowed = options?.backend
     ? new Set(
@@ -308,17 +297,6 @@ export function attachModelSync(
   const path = decodeURIComponent(new URL(uri).pathname);
   const debounceMs = options?.debounceMs ?? DEFAULT_CHANGE_DEBOUNCE_MS;
 
-  const backends: LspBackend[] = ["pyright"];
-
-  const waitForInitialization = async (lang: string, timeoutMs = 5000) => {
-    const start = Date.now();
-    while (Date.now() - start < timeoutMs) {
-      if (await isLspInitialized(lang)) return true;
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    }
-    return false;
-  };
-
   console.log("LSP document path:", path);
   console.log("Monaco URI:", uri);
 
@@ -328,24 +306,16 @@ export function attachModelSync(
     openedDocuments.set(uri, openedForPath);
   }
 
-  // ensure backend ONCE (not per backend loop)
   const openPromise = ensureLspForLanguage(language).then(async () => {
-    await Promise.all(
-      backends.map(async (backend) => {
-        const backendLang = backendLanguage(language, backend);
-        const openKey = `${backend}:${backendLang}`;
+    if (openedForPath!.has(language)) return;
 
-        if (openedForPath!.has(openKey)) return;
-
-        console.log(`Sending didOpen for ${path} via ${backend}`);
-        try {
-          await openDocument(path, backendLang, model.getValue());
-          openedForPath!.add(openKey);
-        } catch (err) {
-          console.error(`didOpen failed for ${path}`, err);
-        }
-      }),
-    );
+    console.log(`Sending didOpen for ${path} via ${language}`);
+    try {
+      await openDocument(path, language, model.getValue());
+      openedForPath!.add(language);
+    } catch (err) {
+      console.error(`didOpen failed for ${path}`, err);
+    }
   });
 
   void openPromise.catch((err) => {

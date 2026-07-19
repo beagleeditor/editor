@@ -33,6 +33,7 @@ import QuickOpen from "./components/QuickOpen";
 
 import {
   attachModelSync,
+  formatDocument,
   listenDiagnostics,
   registerProviders,
 } from "./lib/lsp";
@@ -156,6 +157,9 @@ export function detectLanguage(filename: string): string {
       return "css";
     case "json":
       return "json";
+    case "yaml":
+    case "yml":
+      return "yaml";
     case "md":
       return "markdown";
     case "cpp":
@@ -168,6 +172,21 @@ export function detectLanguage(filename: string): string {
       return "c";
     case "java":
       return "java";
+    case "go":
+      return "go";
+    case "lua":
+      return "lua";
+    case "php":
+      return "php";
+    case "rb":
+      return "ruby";
+    case "cs":
+      return "csharp";
+    case "kt":
+    case "kts":
+      return "kotlin";
+    case "swift":
+      return "swift";
     default:
       return "plaintext";
   }
@@ -204,7 +223,7 @@ function getModelUriForTab(tab: Tab): monaco.Uri {
   }
 
   return monaco.Uri.parse(
-    `inmemory://beagle/${tab.id}/${encodeURIComponent(tab.name)}`,
+    `inmemory://bedit/${tab.id}/${encodeURIComponent(tab.name)}`,
   );
 }
 
@@ -356,6 +375,7 @@ export default function App() {
   const startWidth = useRef(0);
 
   const editorRef = useRef<any>(null);
+  const activeTabRef = useRef<Tab | undefined>(undefined);
   const previewRef = useRef<HTMLDivElement>(null);
   const hydratedRef = useRef(false);
   const openLock = useRef(false);
@@ -444,6 +464,7 @@ export default function App() {
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
+  activeTabRef.current = activeTab;
   const isMarkdown = activeTab?.language === "markdown";
   const activeModelUri = useMemo(
     () => (activeTab ? getModelUriForTab(activeTab).toString() : null),
@@ -581,15 +602,19 @@ export default function App() {
     let path = activeTab.path;
 
     if (!path) {
-      path = await save({
+      const selected = await save({
         title: "Save File",
         defaultPath: await homeDir(),
       });
 
-      if (!path) return;
+      if (!selected) return;
+
+      path = selected;
     }
 
     await fsAPI.writeFile(path, activeTab.content);
+
+    const fileName = path.split(/[/\\]/).pop() ?? activeTab.name;
 
     setTabs((prev) =>
       prev.map((t) =>
@@ -597,8 +622,8 @@ export default function App() {
           ? {
               ...t,
               path,
-              name: path.split(/[/\\]/).pop() ?? t.name,
-              language: detectLanguage(path.split(/[/\\]/).pop() ?? t.name),
+              name: fileName,
+              language: detectLanguage(fileName),
               dirty: false,
             }
           : t,
@@ -696,6 +721,53 @@ export default function App() {
       ),
     );
   };
+
+  const formatActiveDocument = useCallback(async () => {
+    const editor = editorRef.current;
+    const tab = activeTabRef.current;
+    if (!tab?.path || !editor) return;
+
+    try {
+      const response = await formatDocument(tab.path);
+      const edits = response.result;
+
+      if (!Array.isArray(edits) || edits.length === 0) return;
+
+      editor.executeEdits(
+        "format-document",
+        edits.map((edit: any) => ({
+          range: new monaco.Range(
+            edit.range.start.line + 1,
+            edit.range.start.character + 1,
+            edit.range.end.line + 1,
+            edit.range.end.character + 1,
+          ),
+          text: edit.newText,
+          forceMoveMarkers: true,
+        })),
+      );
+    } catch (error) {
+      console.error("Document formatting failed:", error);
+    }
+  }, []);
+
+  const addFormatAction = useCallback(
+    (editor: any, monacoInstance: typeof monaco) => {
+      editor.addAction({
+        id: "beagle.format-document",
+        label: "Format Document",
+        keybindings: [
+          monacoInstance.KeyMod.CtrlCmd |
+            monacoInstance.KeyMod.Shift |
+            monacoInstance.KeyCode.KeyI,
+        ],
+        contextMenuGroupId: "1_modification",
+        contextMenuOrder: 1,
+        run: () => formatActiveDocument(),
+      });
+    },
+    [formatActiveDocument],
+  );
 
   const openSettings = () => {
     setSidebarView("settings");
@@ -1220,6 +1292,7 @@ export default function App() {
                         onChange={updateContent}
                         onMount={(editor, monaco) => {
                           editorRef.current = editor;
+                          addFormatAction(editor, monaco);
                           if (activeTab?.language) {
                             registerProviders(monaco, activeTab.language);
                             registerHoverProvider(monaco, activeTab.language);
@@ -1309,6 +1382,7 @@ export default function App() {
                 onChange={updateContent}
                 onMount={(editor, monaco) => {
                   editorRef.current = editor;
+                  addFormatAction(editor, monaco);
                   if (activeTab?.language) {
                     registerProviders(monaco, activeTab.language);
                     registerHoverProvider(monaco, activeTab.language);

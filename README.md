@@ -52,3 +52,23 @@ bunx tauri dev
 
 > [!NOTE]
 > Tauri automatically downloads and builds all required Rust dependencies, so no additional Rust packages need to be installed manually.
+
+## Language servers
+
+BeagleEditor uses language servers installed on your system for completion, navigation, diagnostics, and formatting. Install the server for the languages you use, then reopen the file.
+
+| Languages | Server command |
+| --- | --- |
+| Rust | `rust-analyzer` |
+| C, C++ | `clangd` |
+| Python | `pyright-langserver --stdio` |
+| JavaScript, TypeScript | `typescript-language-server --stdio` |
+| Go | `gopls` |
+| Lua | `lua-language-server` |
+| PHP | `intelephense --stdio` |
+| Ruby | `ruby-lsp` |
+| C# | `OmniSharp --languageserver` |
+| Kotlin | `kotlin-language-server` |
+| Swift | `sourcekit-lsp` |
+| HTML, CSS, JSON | `vscode-*-language-server --stdio` |
+| YAML | `yaml-language-server --stdio` |

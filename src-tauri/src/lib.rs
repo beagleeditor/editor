@@ -13,7 +13,7 @@ use fs::{
 };
 use lsp::{
     lsp_change, lsp_completion, lsp_definition, lsp_hover, lsp_is_initialized, lsp_open, lsp_save,
-    lsp_signature_help, lsp_start, lsp_stop,
+    lsp_format, lsp_signature_help, lsp_start, lsp_stop,
 };
 use search::search_workspace;
 
@@ -100,6 +100,7 @@ pub fn run() {
             lsp_open,
             lsp_change,
             lsp_save,
+            lsp_format,
             lsp_completion,
             lsp_is_initialized,
             lsp_hover,

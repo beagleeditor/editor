@@ -34,19 +34,45 @@ pub fn lsp_start(app: tauri::AppHandle, language: String) -> Result<(), String> 
 
         let start_result = match language.as_str() {
             "rust" => manager.start(app.clone(), language.clone(), "rust-analyzer", &[]),
-            "cpp" => manager.start(app.clone(), language.clone(), "clangd", &[]),
+            "c" | "cpp" => manager.start(app.clone(), language.clone(), "clangd", &[]),
             "python" => manager.start(
                 app.clone(),
                 language.clone(),
                 "pyright-langserver",
                 &["--stdio"],
             ),
-            "typescript" => manager.start(
+            "javascript" | "typescript" => manager.start(
                 app.clone(),
                 language.clone(),
                 "typescript-language-server",
                 &["--stdio"],
             ),
+            "go" => manager.start(app.clone(), language.clone(), "gopls", &[]),
+            "lua" => manager.start(app.clone(), language.clone(), "lua-language-server", &[]),
+            "php" => manager.start(app.clone(), language.clone(), "intelephense", &["--stdio"]),
+            "ruby" => manager.start(app.clone(), language.clone(), "ruby-lsp", &[]),
+            "csharp" => manager.start(app.clone(), language.clone(), "OmniSharp", &["--languageserver"]),
+            "kotlin" => manager.start(app.clone(), language.clone(), "kotlin-language-server", &[]),
+            "swift" => manager.start(app.clone(), language.clone(), "sourcekit-lsp", &[]),
+            "html" => manager.start(
+                app.clone(),
+                language.clone(),
+                "vscode-html-language-server",
+                &["--stdio"],
+            ),
+            "css" => manager.start(
+                app.clone(),
+                language.clone(),
+                "vscode-css-language-server",
+                &["--stdio"],
+            ),
+            "json" => manager.start(
+                app.clone(),
+                language.clone(),
+                "vscode-json-language-server",
+                &["--stdio"],
+            ),
+            "yaml" => manager.start(app.clone(), language.clone(), "yaml-language-server", &["--stdio"]),
             _ => return Err("Unsupported language".into()),
         };
 
@@ -199,6 +225,22 @@ pub fn lsp_save(path: String) {
     unsafe {
         let client = &mut *client_ptr;
         let _ = client.did_save(&path);
+    }
+}
+
+#[tauri::command]
+pub fn lsp_format(path: String) -> Result<serde_json::Value, String> {
+    let client_ptr: *mut LspClient = {
+        let mut manager = LSP_MANAGER.lock().unwrap();
+        match manager.client_for_path_mut(&path) {
+            Some(client) => client as *mut LspClient,
+            None => return Err("No LSP client for file".into()),
+        }
+    };
+
+    unsafe {
+        let client = &mut *client_ptr;
+        client.formatting(&path).map_err(|e| e.to_string())
     }
 }
 
