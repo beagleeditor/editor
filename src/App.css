@@ -54,14 +54,11 @@ body,
 }
 
 .app-shell {
+  width: 100%;
   height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-.app {
-  flex: 1;
+  min-width: 0;
   min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -73,17 +70,25 @@ body {
 }
 
 .app {
+  width: 100%;
+  height: 100%;
   display: flex;
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
   min-height: 0;
+  overflow: hidden;
   flex-direction: column;
   background: var(--bg);
 }
 
 .workspace {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+
   display: flex;
   overflow: hidden;
+
   padding: 12px;
   gap: 12px;
 }
@@ -162,6 +167,7 @@ body {
 
 .main {
   flex: 1;
+  overflow: hidden;
 
   display: grid;
   grid-template-rows: 48px 1fr;
@@ -576,12 +582,6 @@ body {
   height: 100%;
   border-right: 1px solid var(--border);
   overflow: hidden;
-}
-
-.workspace {
-  flex: 1;
-  min-height: 0;
-  display: flex;
 }
 
 .sidebar {

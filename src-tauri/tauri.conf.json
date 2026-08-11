@@ -16,7 +16,7 @@
         "width": 950,
         "height": 800,
         "resizable": true,
-        "titleBarStyle": "Overlay"
+        "titleBarStyle": "Visible"
       }
     ],
     "security": {

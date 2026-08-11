@@ -953,12 +953,37 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const onResize = () => {
-      editorRef.current?.layout?.();
+    const editor = editorRef.current;
+    const container = editor?.getDomNode()?.parentElement;
+
+    if (!editor || !container) return;
+
+    const observer = new ResizeObserver(() => {
+      editor.layout();
+    });
+
+    observer.observe(container);
+
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    let frame = 0;
+
+    const resize = () => {
+      cancelAnimationFrame(frame);
+
+      frame = requestAnimationFrame(() => {
+        window.dispatchEvent(new Event("resize"));
+      });
     };
 
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    window.addEventListener("resize", resize);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("resize", resize);
+    };
   }, []);
 
   useEffect(() => {
@@ -1336,7 +1361,7 @@ export default function App() {
                           theme === "dark" ? "beagle-dark" : "beagle-light"
                         }
                         options={{
-                          automaticLayout: true,
+                          automaticLayout: false,
                           minimap: { enabled: settings?.minimap ?? true },
                           scrollBeyondLastLine: false,
                           fontSize: Math.max(10, settings?.fontSize ?? 14),
