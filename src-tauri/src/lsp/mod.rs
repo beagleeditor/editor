@@ -51,12 +51,7 @@ pub fn lsp_start(app: tauri::AppHandle, language: String) -> Result<(), String> 
     let workspace = {
         let workspace = WORKSPACE_ROOT.lock().unwrap();
 
-        workspace.clone().unwrap_or_else(|| {
-            std::env::current_dir()
-                .unwrap_or_else(|_| Path::new(".").to_path_buf())
-                .to_string_lossy()
-                .to_string()
-        })
+        workspace.clone().unwrap_or_else(workspace_root)
     };
 
     println!("Using workspace: {}", workspace);
@@ -190,26 +185,40 @@ pub fn lsp_is_initialized(language: String) -> bool {
 
 #[tauri::command]
 pub fn lsp_open(path: String, language: String, text: String) {
-    println!("lsp_open(path={})", path);
+    println!("========================================");
+    println!("LSP OPEN");
+    println!("Path:     {}", path);
+    println!("Language: {}", language);
+    println!("========================================");
 
     {
         let mut open_docs = OPEN_DOCUMENTS.lock().unwrap();
+
         if open_docs.contains(&path) {
             println!("Document already opened: {}", path);
             return;
         }
+
         open_docs.insert(path.clone());
     }
 
     let client_ptr: *mut LspClient = {
         let mut manager = LSP_MANAGER.lock().unwrap();
 
+        println!("Associating {} -> {}", path, language);
+
         manager.associate_path(&path, &language);
 
         match manager.get_client_mut(&language) {
-            Some(client) => client as *mut LspClient,
+            Some(client) => {
+                println!("Found LSP client for {}", language);
+
+                client as *mut LspClient
+            }
+
             None => {
                 eprintln!("No LSP client found for {}", language);
+
                 return;
             }
         }

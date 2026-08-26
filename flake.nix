@@ -1,5 +1,5 @@
 {
-  description = "BeagleEditor - Tauri Monaco Editor";
+  description = "BeagleEditor - The 'beagleful' editor";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -21,6 +21,7 @@
           f (
             import nixpkgs {
               inherit system;
+              config.allowBroken = true;
             }
           )
         );
@@ -37,14 +38,13 @@
             nodejs
             cargo
             rustc
-            rustPlatform.cargoSetupHook
             pkg-config
           ];
 
-          buildInputs = with pkgs; [
-            webkitgtk_4_1
-            gtk3
-            libsoup_3
+          buildInputs = pkgs.lib.optionals pkgs.stdenv.isLinux [
+            pkgs.webkitgtk_4_1
+            pkgs.gtk3
+            pkgs.libsoup_3
           ];
 
           buildPhase = ''
