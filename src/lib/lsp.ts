@@ -24,6 +24,7 @@ const openedDocuments = new Map<string, Set<string>>();
 const DEFAULT_CHANGE_DEBOUNCE_MS = 200;
 const activeModelSyncs = new WeakMap<any, any>();
 const activeModels = new WeakSet<any>();
+const modelLanguages = new WeakMap<any, string>();
 const backendInitCache = new Map<string, Promise<void>>();
 
 async function startLsp(language: string): Promise<void> {
@@ -285,7 +286,16 @@ export function attachModelSync(
     return { dispose() {} };
   }
 
-  // 🔥 HARD DEDUPE PER MODEL
+  const prevSync = activeModelSyncs.get(model);
+  const prevLanguage = modelLanguages.get(model);
+
+  // If the language changed, dispose the old sync so we can re-attach
+  // for the new language server
+  if (prevSync && prevLanguage && prevLanguage !== language) {
+    prevSync.dispose();
+  }
+
+  // After disposing (if we did), check again
   if (activeModelSyncs.has(model)) {
     return activeModelSyncs.get(model);
   }
@@ -345,11 +355,14 @@ export function attachModelSync(
       if (changeTimer) clearTimeout(changeTimer);
       changeDisposable.dispose();
       activeModelSyncs.delete(model);
+      activeModels.delete(model);
+      modelLanguages.delete(model);
     },
   };
 
   activeModelSyncs.set(model, sync);
   activeModels.add(model);
+  modelLanguages.set(model, language);
 
   return sync;
 }
