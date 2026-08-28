@@ -375,6 +375,7 @@ export default function App() {
   const startWidth = useRef(0);
 
   const editorRef = useRef<any>(null);
+  const [editorInstance, setEditorInstance] = useState<any>(null);
   const activeTabRef = useRef<Tab | undefined>(undefined);
   const previewRef = useRef<HTMLDivElement>(null);
   const hydratedRef = useRef(false);
@@ -953,7 +954,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const editor = editorRef.current;
+    const editor = editorInstance;
     const container = editor?.getDomNode()?.parentElement;
 
     if (!editor || !container) return;
@@ -965,7 +966,7 @@ export default function App() {
     observer.observe(container);
 
     return () => observer.disconnect();
-  }, []);
+  }, [editorInstance]);
 
   useEffect(() => {
     let frame = 0;
@@ -1317,6 +1318,7 @@ export default function App() {
                         onChange={updateContent}
                         onMount={(editor, monaco) => {
                           editorRef.current = editor;
+                          setEditorInstance(editor);
                           addFormatAction(editor, monaco);
                           if (activeTab?.language) {
                             registerProviders(monaco, activeTab.language);
@@ -1361,7 +1363,7 @@ export default function App() {
                           theme === "dark" ? "beagle-dark" : "beagle-light"
                         }
                         options={{
-                          automaticLayout: false,
+                          automaticLayout: true,
                           minimap: { enabled: settings?.minimap ?? true },
                           scrollBeyondLastLine: false,
                           fontSize: Math.max(10, settings?.fontSize ?? 14),
@@ -1407,6 +1409,7 @@ export default function App() {
                 onChange={updateContent}
                 onMount={(editor, monaco) => {
                   editorRef.current = editor;
+                  setEditorInstance(editor);
                   addFormatAction(editor, monaco);
                   if (activeTab?.language) {
                     registerProviders(monaco, activeTab.language);

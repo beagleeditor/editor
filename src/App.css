@@ -332,6 +332,16 @@ body {
   flex-direction: row !important;
 }
 
+.monaco-editor {
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  padding: 8px !important;
+  border: none !important;
+}
+
 .tab:hover {
   background: var(--surface-hover);
 }
