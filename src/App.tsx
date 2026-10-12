@@ -30,6 +30,7 @@ import { Tab } from "./components/EditorTabs";
 import About from "./components/About";
 import Dialog from "./components/Dialog";
 import QuickOpen from "./components/QuickOpen";
+import CommandPalette, { type PaletteCommand } from "./components/CommandPalette";
 
 import {
   attachModelSync,
@@ -356,6 +357,17 @@ function registerSignatureHelpProvider(
   });
 }
 
+const registeredLspLanguages = new Set<string>();
+
+function ensureLanguageProviders(monacoInstance: typeof import("monaco-editor"), language: string) {
+  if (!language || language === "plaintext" || registeredLspLanguages.has(language)) return;
+  registeredLspLanguages.add(language);
+  registerProviders(monacoInstance, language);
+  registerHoverProvider(monacoInstance, language);
+  registerDefinitionProvider(monacoInstance, language);
+  registerSignatureHelpProvider(monacoInstance, language);
+}
+
 /* =======================================================
    APP
 ======================================================= */
@@ -428,6 +440,7 @@ export default function App() {
   const { settings, update } = useSettings();
 
   const [quickOpenVisible, setQuickOpenVisible] = useState(false);
+  const [commandPaletteVisible, setCommandPaletteVisible] = useState(false);
   const [quickOpenQuery, setQuickOpenQuery] = useState("");
   const [line, setLine] = useState(1);
   const [column, setColumn] = useState(1);
@@ -462,6 +475,8 @@ export default function App() {
   /* ---------------- TABS ---------------- */
 
   const [tabs, setTabs] = useState<Tab[]>([]);
+  const tabsRef = useRef<Tab[]>([]);
+  tabsRef.current = tabs;
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
@@ -525,10 +540,17 @@ export default function App() {
         setWorkspaceDir(session.workspaceDir);
       }
 
-      setTabs(session.tabs || []);
-      setActiveTabId(session.activeTabId);
-
-      setShowWelcome(false);
+      const restoredTabs = Array.isArray(session.tabs) ? session.tabs : [];
+      setTabs(restoredTabs);
+      setActiveTabId(
+        restoredTabs.some((tab) => tab.id === session.activeTabId)
+          ? session.activeTabId
+          : (restoredTabs[0]?.id ?? null),
+      );
+      setShowWelcome(restoredTabs.length === 0 && !session.workspaceDir);
+    } catch (error) {
+      console.error("Could not restore BeagleEditor session:", error);
+      localStorage.removeItem("beagle-session");
     } finally {
       setBooting(false);
 
@@ -573,6 +595,7 @@ export default function App() {
 
       const id = crypto.randomUUID();
 
+      const existingId = tabsRef.current.find((tab) => tab.path === selected)?.id;
       setTabs((prev) => {
         const exists = prev.find((t) => t.path === selected);
         if (exists) return prev;
@@ -590,7 +613,7 @@ export default function App() {
         ];
       });
 
-      setActiveTabId(id);
+      setActiveTabId(existingId ?? id);
       setShowWelcome(false);
     } finally {
       openLock.current = false;
@@ -632,7 +655,7 @@ export default function App() {
     );
   }, [activeTab]);
 
-  const reloadWorkspace = async () => {
+  const reloadWorkspace = useCallback(async () => {
     if (!workspaceDir) return;
 
     const entries = await fsAPI.readDir(workspaceDir);
@@ -643,7 +666,7 @@ export default function App() {
       is_dir: true,
       children: entries,
     });
-  };
+  }, [workspaceDir]);
 
   const openFolder = async () => {
     if (openFolderLock.current) return;
@@ -1123,6 +1146,32 @@ export default function App() {
     await reloadWorkspace();
   };
 
+  const commands = useMemo<PaletteCommand[]>(() => [
+    { id: "file.new", label: "New File", category: "File", shortcut: "⌘ N", run: newFile },
+    { id: "file.open", label: "Open File…", category: "File", shortcut: "⌘ O", run: openFile },
+    { id: "workspace.open", label: "Open Folder…", category: "Workspace", shortcut: "⌘ ⇧ O", run: openFolder },
+    { id: "file.save", label: "Save File", category: "File", shortcut: "⌘ S", run: saveFile },
+    { id: "editor.format", label: "Format Document", category: "Editor", shortcut: "⌘ ⇧ I", run: formatActiveDocument },
+    { id: "view.explorer", label: "Show Explorer", category: "View", run: () => { setSidebarView("files"); setSidebarVisible(true); } },
+    { id: "view.search", label: "Show Search", category: "View", run: () => { setSidebarView("search"); setSidebarVisible(true); } },
+    { id: "view.source-control", label: "Show Source Control", category: "View", run: () => { setSidebarView("git"); setSidebarVisible(true); } },
+    { id: "view.settings", label: "Open Settings", category: "Preferences", shortcut: "⌘ ,", run: openSettings },
+    { id: "help.about", label: "About BeagleEditor", category: "Help", run: openAbout },
+    { id: "view.toggle-sidebar", label: "Toggle Sidebar", category: "View", run: () => setSidebarVisible((visible) => !visible) },
+  ], [newFile, openFile, openFolder, saveFile, formatActiveDocument, openSettings, openAbout]);
+
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === "p") {
+        event.preventDefault();
+        setCommandPaletteVisible((visible) => !visible);
+        setQuickOpenVisible(false);
+      }
+    };
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, []);
+
   if (booting) {
     return (
       <div className="app-shell">
@@ -1133,6 +1182,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
+      {commandPaletteVisible && <CommandPalette theme={theme} commands={commands} onClose={() => setCommandPaletteVisible(false)} />}
       {quickOpenVisible && (
         <QuickOpen
           theme={theme}
@@ -1321,16 +1371,7 @@ export default function App() {
                           setEditorInstance(editor);
                           addFormatAction(editor, monaco);
                           if (activeTab?.language) {
-                            registerProviders(monaco, activeTab.language);
-                            registerHoverProvider(monaco, activeTab.language);
-                            registerDefinitionProvider(
-                              monaco,
-                              activeTab.language,
-                            );
-                            registerSignatureHelpProvider(
-                              monaco,
-                              activeTab.language,
-                            );
+                            ensureLanguageProviders(monaco, activeTab.language);
                           }
                           const model = syncActiveModel();
                           if (model && editor.getModel() !== model) {
@@ -1339,10 +1380,8 @@ export default function App() {
                           editor.onDidChangeModel(() => {
                             const m = editor.getModel();
                             if (m) {
-                              void attachModelSync(
-                                m,
-                                activeTab?.language ?? "plaintext",
-                              );
+                              ensureLanguageProviders(monaco, m.getLanguageId());
+                              void attachModelSync(m, m.getLanguageId());
                             }
                           });
 
@@ -1412,10 +1451,7 @@ export default function App() {
                   setEditorInstance(editor);
                   addFormatAction(editor, monaco);
                   if (activeTab?.language) {
-                    registerProviders(monaco, activeTab.language);
-                    registerHoverProvider(monaco, activeTab.language);
-                    registerDefinitionProvider(monaco, activeTab.language);
-                    registerSignatureHelpProvider(monaco, activeTab.language);
+                    ensureLanguageProviders(monaco, activeTab.language);
                   }
                   const model = syncActiveModel();
                   if (model && editor.getModel() !== model) {
@@ -1424,10 +1460,8 @@ export default function App() {
                   editor.onDidChangeModel(() => {
                     const m = editor.getModel();
                     if (m) {
-                      void attachModelSync(
-                        m,
-                        activeTab?.language ?? "plaintext",
-                      );
+                      ensureLanguageProviders(monaco, m.getLanguageId());
+                      void attachModelSync(m, m.getLanguageId());
                     }
                   });
 
@@ -1556,14 +1590,18 @@ export default function App() {
         </div>
 
         <StatusBar
+          fileName={activeTab?.path ?? activeTab?.name ?? null}
+          dirty={activeTab?.dirty ?? false}
           language={activeTab?.language ?? "plaintext"}
-          lineEnding="LF"
+          lineEnding={activeTab?.content.includes("\r\n") ? "CRLF" : "LF"}
           encoding="UTF-8"
           onLanguageChange={changeLanguage}
           line={line}
           column={column}
           tabSize={settings.tabSize}
-          insertSpaces={true}
+          insertSpaces={editorInstance
+            ? (editorInstance.getModel()?.getOptions().insertSpaces ?? true)
+            : true}
         />
       </div>
     </div>

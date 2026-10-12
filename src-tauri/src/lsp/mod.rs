@@ -15,7 +15,9 @@ use std::sync::{LazyLock, Mutex};
 static INITIALIZED_LANGUAGES: LazyLock<Mutex<HashSet<String>>> =
     LazyLock::new(|| Mutex::new(HashSet::new()));
 
-static OPEN_DOCUMENTS: LazyLock<Mutex<HashSet<String>>> =
+// A document is opened independently in each language server. A path-only set
+// incorrectly prevents TypeScript from opening a file previously opened by Pyright.
+static OPEN_DOCUMENTS: LazyLock<Mutex<HashSet<(String, String)>>> =
     LazyLock::new(|| Mutex::new(HashSet::new()));
 
 static WORKSPACES: LazyLock<Mutex<HashMap<String, String>>> =
@@ -194,12 +196,11 @@ pub fn lsp_open(path: String, language: String, text: String) {
     {
         let mut open_docs = OPEN_DOCUMENTS.lock().unwrap();
 
-        if open_docs.contains(&path) {
-            println!("Document already opened: {}", path);
+        let key = (path.clone(), language.clone());
+        if open_docs.contains(&key) {
+            println!("Document already opened: {} ({})", path, language);
             return;
         }
-
-        open_docs.insert(path.clone());
     }
 
     let client_ptr: *mut LspClient = {
@@ -218,7 +219,6 @@ pub fn lsp_open(path: String, language: String, text: String) {
 
             None => {
                 eprintln!("No LSP client found for {}", language);
-
                 return;
             }
         }
@@ -229,8 +229,11 @@ pub fn lsp_open(path: String, language: String, text: String) {
 
         if let Err(err) = client.did_open(&path, &language, 1, &text) {
             eprintln!("did_open failed: {err}");
+            return;
         }
     }
+
+    OPEN_DOCUMENTS.lock().unwrap().insert((path, language));
 }
 
 #[tauri::command]

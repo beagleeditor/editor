@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { FileIcon } from "./Explorer";
 
 export type Tab = {
@@ -24,12 +25,22 @@ export default function EditorTabs({
   onNewTab,
   onClose,
 }: Props) {
+  const tabsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const activeTab = tabsRef.current?.querySelector<HTMLElement>(".tab.active");
+    activeTab?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [activeTabId, tabs.length]);
+
   return (
-    <div className="tabs">
+    <div className="tabs" ref={tabsRef} aria-label="Open files" role="tablist">
       {tabs.map((tab) => (
         <div
           key={tab.id}
           className={`tab ${tab.id === activeTabId ? "active" : ""}`}
+          role="tab"
+          aria-selected={tab.id === activeTabId}
+          title={tab.path ?? tab.name}
           onClick={() => onSelect(tab.id)}
         >
           {/* FILE ICON */}

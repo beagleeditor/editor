@@ -83,13 +83,18 @@ export async function saveDocument(path: string) {
 }
 
 export async function hover(uri, line, character) {
-  return await invoke<LspResponse>("lsp_hover", { uri, line, character });
+  const path = uriToPath(uri);
+  return await invoke<LspResponse>("lsp_hover", { path, line, character });
+}
+
+function uriToPath(uri: string): string {
+  if (!uri.startsWith("file://")) return uri;
+  try { return decodeURIComponent(new URL(uri).pathname); }
+  catch { return uri; }
 }
 
 export async function completion(uri, line, character) {
-  const path = uri.startsWith("file://")
-    ? decodeURIComponent(new URL(uri).pathname)
-    : uri;
+  const path = uriToPath(uri);
 
   return await invoke<LspResponse>("lsp_completion", {
     path,
@@ -99,11 +104,13 @@ export async function completion(uri, line, character) {
 }
 
 export async function definition(uri, line, character) {
-  return await invoke<LspResponse>("lsp_definition", { uri, line, character });
+  const path = uriToPath(uri);
+  return await invoke<LspResponse>("lsp_definition", { path, line, character });
 }
 
 export async function references(uri, line, character) {
-  return await invoke<LspResponse>("lsp_references", { uri, line, character });
+  const path = uriToPath(uri);
+  return await invoke<LspResponse>("lsp_references", { path, line, character });
 }
 
 export async function formatDocument(path: string) {
@@ -173,19 +180,14 @@ export function registerProviders(monaco, language) {
     },
   });
 
-  console.log("Registering completion provider for", language);
   monaco.languages.registerCompletionItemProvider(language, {
     triggerCharacters: [".", ":", "<", '"', "'", "/", "@", "*", "#", "_"],
     async provideCompletionItems(model, position) {
       const uri = model.uri.toString();
       const line = position.lineNumber - 1;
       const character = position.column - 1;
-      console.log("Completion requested", uri, line, character);
-      console.log("Completion model language:", model.getLanguageId());
       try {
         const result = await completion(uri, line, character);
-        console.log("Raw completion result:", result);
-        console.log("Completion response", result);
         const items = Array.isArray(result?.result)
           ? result.result
           : (result?.result?.items ?? []);
@@ -244,7 +246,6 @@ export function registerProviders(monaco, language) {
       return { suggestions: [] };
     },
   });
-  console.log("Completion provider registered for", language);
 
   monaco.languages.registerDefinitionProvider(language, {
     async provideDefinition(model, position) {
@@ -280,9 +281,7 @@ export function attachModelSync(
   language,
   options?: { debounceMs?: number },
 ) {
-  console.log("attachModelSync called:", model?.uri?.toString?.(), language);
   if (!model?.uri || model.uri.scheme !== "file") {
-    console.log("Skipping invalid Monaco model:", model?.uri?.toString?.());
     return { dispose() {} };
   }
 
@@ -307,8 +306,6 @@ export function attachModelSync(
   const path = decodeURIComponent(new URL(uri).pathname);
   const debounceMs = options?.debounceMs ?? DEFAULT_CHANGE_DEBOUNCE_MS;
 
-  console.log("LSP document path:", path);
-  console.log("Monaco URI:", uri);
 
   let openedForPath = openedDocuments.get(uri);
   if (!openedForPath) {
@@ -339,7 +336,7 @@ export function attachModelSync(
     if (disposed) return;
     changeTimer = null;
 
-    void changeDocument(path, model.getValue()).catch((err) => {
+    void openPromise.then(() => changeDocument(path, model.getValue())).catch((err) => {
       console.error("lsp_change failed", err);
     });
   };
