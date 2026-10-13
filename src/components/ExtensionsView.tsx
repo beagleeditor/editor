@@ -1,4 +1,4 @@
-import { Check, ExternalLink, FolderPlus, Puzzle, RefreshCw } from "lucide-react";
+import { Check, ExternalLink, FolderPlus, Puzzle, RefreshCw, Trash2 } from "lucide-react";
 
 type Extension = {
   manifest: { id: string; name: string; version: string; description?: string };
@@ -13,11 +13,12 @@ type Props = {
   onToggle: (id: string, enabled: boolean) => void;
   onReload: () => void;
   onInstall: () => void;
+  onRemove: (id: string, name: string) => void;
   installing: boolean;
   onOpenDirectory: () => void;
 };
 
-export default function ExtensionsView({ extensions, status, directory, enabled, onToggle, onReload, onInstall, installing, onOpenDirectory }: Props) {
+export default function ExtensionsView({ extensions, status, directory, enabled, onToggle, onReload, onInstall, onRemove, installing, onOpenDirectory }: Props) {
   return (
     <section className="extensions-view">
       <header className="extensions-header">
@@ -54,6 +55,7 @@ export default function ExtensionsView({ extensions, status, directory, enabled,
               <button className={`extension-toggle ${isEnabled ? "enabled" : ""}`} onClick={() => onToggle(manifest.id, !isEnabled)} aria-pressed={isEnabled} title={isEnabled ? "Disable extension" : "Enable extension"}>
                 {isEnabled ? <><Check size={13} /> Enabled</> : "Enable"}
               </button>
+              <button className="extensions-icon-button extension-remove-button" onClick={() => onRemove(manifest.id, manifest.name)} title={`Remove ${manifest.name}`} aria-label={`Remove ${manifest.name}`}><Trash2 size={14} /></button>
             </article>;
           })}
         </div>

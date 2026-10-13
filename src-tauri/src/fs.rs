@@ -36,16 +36,27 @@ pub fn list_extensions(app: tauri::AppHandle) -> Result<Vec<InstalledExtension>,
         let manifest_path = item.path().join("manifest.json");
         let manifest_text = match fs::read_to_string(&manifest_path) { Ok(text) => text, Err(_) => continue };
         let manifest: ExtensionManifest = match serde_json::from_str(&manifest_text) { Ok(value) => value, Err(_) => continue };
-        if manifest.id.trim().is_empty() || manifest.name.trim().is_empty() || manifest.version.trim().is_empty() { continue; }
+        if !valid_extension_id(&manifest.id) || manifest.name.trim().is_empty() || manifest.version.trim().is_empty() { continue; }
+        // The manifest ID is also the installed directory name. Enforce this so
+        // removal and enabled-state preferences always target the same extension.
+        if item.file_name().to_str() != Some(manifest.id.as_str()) { continue; }
         let entry_name = manifest.main.as_deref().unwrap_or("main.js");
         let entry_path = item.path().join(entry_name);
         // Keep the entry point inside the extension directory.
-        if entry_path.parent() != Some(item.path().as_path()) { continue; }
+        if entry_path.parent() != Some(item.path().as_path()) || !entry_path.is_file() { continue; }
+        if extensions.iter().any(|extension: &InstalledExtension| extension.manifest.id == manifest.id) { continue; }
         let entry = match fs::read_to_string(&entry_path) { Ok(source) => source, Err(_) => continue };
         extensions.push(InstalledExtension { manifest, entry, path: item.path().to_string_lossy().into_owned() });
     }
     extensions.sort_by(|a, b| a.manifest.name.to_lowercase().cmp(&b.manifest.name.to_lowercase()));
     Ok(extensions)
+}
+
+fn valid_extension_id(id: &str) -> bool {
+    !id.trim().is_empty()
+        && id != "."
+        && id != ".."
+        && id.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
 }
 
 #[tauri::command]
@@ -70,9 +81,7 @@ pub fn install_extension(app: tauri::AppHandle, source: String) -> Result<String
     if manifest.id.trim().is_empty() || manifest.name.trim().is_empty() || manifest.version.trim().is_empty() {
         return Err("The extension manifest must include a non-empty id, name, and version.".into());
     }
-    if !manifest.id.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
-        || manifest.id == "." || manifest.id == ".."
-    {
+    if !valid_extension_id(&manifest.id) {
         return Err("Extension id may contain only letters, numbers, dots, hyphens, and underscores.".into());
     }
 
@@ -94,6 +103,22 @@ pub fn install_extension(app: tauri::AppHandle, source: String) -> Result<String
 
     copy_extension_tree(&source, &destination)?;
     Ok(format!("Installed {} v{}.", manifest.name, manifest.version))
+}
+
+#[tauri::command]
+pub fn remove_extension(app: tauri::AppHandle, id: String) -> Result<String, String> {
+    if !valid_extension_id(&id) {
+        return Err("Invalid extension id.".into());
+    }
+    let base = app.path().app_config_dir().map_err(|e| e.to_string())?.join("extensions");
+    let destination = base.join(&id);
+    let metadata = fs::symlink_metadata(&destination)
+        .map_err(|_| format!("Extension '{id}' is not installed."))?;
+    if !metadata.file_type().is_dir() {
+        return Err("The extension path is not a directory.".into());
+    }
+    fs::remove_dir_all(&destination).map_err(|e| format!("Could not remove extension '{id}': {e}"))?;
+    Ok(format!("Removed extension '{id}'."))
 }
 
 fn copy_extension_tree(source: &Path, destination: &Path) -> Result<(), String> {

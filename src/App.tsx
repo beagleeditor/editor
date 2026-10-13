@@ -491,11 +491,33 @@ export default function App() {
             registerCommand: (command: { id: string; title: string; run: () => void | Promise<void> }) => {
               if (!command?.id || !command.title || typeof command.run !== "function") return () => {};
               const fullId = `${id}.${command.id}`;
-              const item: ExtensionCommand = { id: fullId, label: command.title, category: extension.manifest.name, extensionId: id, run: command.run };
+              if (registered.has(fullId)) {
+                console.warn(`Extension ${id} registered duplicate command id: ${command.id}`);
+                return () => {};
+              }
+              const item: ExtensionCommand = {
+                id: fullId,
+                label: command.title,
+                category: extension.manifest.name,
+                extensionId: id,
+                run: async () => {
+                  try {
+                    await command.run();
+                  } catch (error) {
+                    console.error(`Extension ${id} command "${command.title}" failed:`, error);
+                    setExtensionStatus(`${extension.manifest.name}: “${command.title}” failed; see developer console`);
+                  }
+                },
+              };
               registered.set(fullId, item);
               commands.push(item);
               setExtensionCommands([...commands]);
-              return () => registered.delete(fullId);
+              return () => {
+                registered.delete(fullId);
+                const index = commands.findIndex((entry) => entry.id === fullId);
+                if (index !== -1) commands.splice(index, 1);
+                setExtensionCommands([...commands]);
+              };
             },
             showMessage: (message: string) => window.alert(`[${extension.manifest.name}] ${String(message)}`),
             getActiveDocument: () => {
@@ -1366,6 +1388,18 @@ export default function App() {
                     enabled={enabledExtensions}
                     onToggle={(id, enabled) => setEnabledExtensions((current) => ({ ...current, [id]: enabled }))}
                     onReload={() => void reloadExtensions()}
+                    onRemove={(id, name) => {
+                      if (!window.confirm(`Remove “${name}” and its installed files?`)) return;
+                      void invoke<string>("remove_extension", { id }).then(async (message) => {
+                        await reloadExtensions();
+                        setEnabledExtensions((current) => {
+                          const next = { ...current };
+                          delete next[id];
+                          return next;
+                        });
+                        setExtensionStatus(message);
+                      }).catch((error) => setExtensionStatus(`Removal failed: ${String(error)}`));
+                    }}
                     installing={installingExtension}
                     onInstall={async () => {
                       if (installingExtension) return;

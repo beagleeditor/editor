@@ -1965,6 +1965,8 @@ button:focus-visible,
 .extension-card-title span { color: var(--muted); font-size: 10px; font-weight: 400; }
 .extension-toggle { flex: 0 0 auto; border: 1px solid var(--border); border-radius: 7px; padding: 6px 8px; background: transparent; color: var(--text); font-size: 10px; cursor: pointer; }
 .extension-toggle.enabled { display: inline-flex; align-items: center; gap: 4px; background: var(--surface-hover); }
+.extension-remove-button { flex: 0 0 auto; padding: 6px !important; color: var(--muted); }
+.extension-remove-button:hover:not(:disabled) { color: #ef4444; }
 .extensions-footer { margin-top: auto; padding: 14px 16px; border-top: 1px solid var(--border); color: var(--muted); font-size: 10px; line-height: 1.5; }
 
 /* Blue accent only: intentionally leave every existing background token unchanged. */

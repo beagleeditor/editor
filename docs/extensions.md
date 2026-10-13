@@ -6,7 +6,7 @@ This guide explains how to create, install, test, and troubleshoot extensions fo
 
 ## 1. How extensions work
 
-An extension is a folder containing a `manifest.json` file and a JavaScript entry point. BeagleEditor discovers extension folders in its application configuration directory. From the **Extensions** view you can open that directory, reload the list, and enable or disable extensions.
+An extension is a folder containing a `manifest.json` file and a JavaScript entry point. BeagleEditor discovers extension folders in its application configuration directory. From the **Extensions** view you can open that directory, reload the list, install an extension from a folder, enable or disable it, and remove it with confirmation.
 
 Each extension's entry module exports an `activate(api)` function. BeagleEditor calls it when the extension is enabled. The function can register command-palette commands and use the small API described below. Return a cleanup function (or an object with a `dispose()` method) to release resources when the extension is disabled or reloaded.
 
@@ -54,7 +54,7 @@ Fields:
 | `description` | No | Short description displayed in the Extensions view. |
 | `main` | No | Entry filename. Defaults to `main.js`. The entry file must be directly inside the extension folder. |
 
-The manifest must be valid JSON. BeagleEditor skips folders with missing or invalid manifests, blank required fields, or unreadable entry files. Use a unique `id` for every extension; command IDs are prefixed with it, but duplicate extension IDs are not a supported setup.
+The manifest must be valid JSON. BeagleEditor skips folders with missing or invalid manifests, blank required fields, invalid IDs, duplicate IDs, or missing/unreadable entry files. Extension IDs may contain ASCII letters, numbers, dots, hyphens, and underscores. Use a unique `id` for every extension; command IDs are prefixed with it.
 
 ## 4. Your first extension
 
@@ -136,6 +136,8 @@ This is read-only snapshot data. It does not provide an API to edit the document
 - **Disable:** BeagleEditor runs the cleanup returned by `activate`, if provided.
 - **Reload:** BeagleEditor rediscovers installed extension folders and reactivates enabled extensions.
 - **Activation errors:** Errors are written to the developer console and the Extensions view may show an activation failure. Check the console for the detailed error.
+- **Command errors:** Failed commands are logged to the developer console and reported in the Extensions view status.
+- **Remove:** Use the trash icon on an extension card and confirm. This deletes the installed copy from BeagleEditor's extension directory; keep a separate copy if you want to reinstall it later.
 
 Use cleanup to remove event listeners, stop timers, cancel work, and unregister commands. Avoid starting background work that cannot be stopped.
 
@@ -148,7 +150,7 @@ The current API is intentionally small. It does **not** currently provide:
 - Editor decorations, custom editor actions, or custom sidebar panels.
 - A document-editing API or document-change events.
 - A stable public API guarantee across releases.
-- A sandbox or permission system.
+- A sandbox or permission system. Extensions execute in the editor web view and should be treated as trusted code.
 
 Entry files are loaded as JavaScript modules from source text. Relative imports from an extension's entry file are not supported by this loading approach. For now, keep an extension self-contained in its entry file and use browser-standard JavaScript features available in the editor's web view.
 
@@ -175,4 +177,3 @@ Entry files are loaded as JavaScript modules from source text. Relative imports 
 ### Activation fails
 
 Open the developer console and inspect the error logged for the extension. Check JavaScript syntax and ensure the entry module uses `export function activate(api) { ... }`. Remember that relative module imports are not supported.
-
