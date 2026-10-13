@@ -12,11 +12,9 @@ use super::transport::Transport;
 
 pub struct LspClient {
     transport: Arc<Transport>,
-    app_handle: tauri::AppHandle,
     versions: HashMap<String, i32>,
     next_id: AtomicU64,
     pending: Arc<Mutex<HashMap<u64, Sender<Value>>>>,
-    server_capabilities: Value,
 }
 
 impl LspClient {
@@ -115,11 +113,9 @@ impl LspClient {
 
         Ok(Self {
             transport,
-            app_handle,
             versions: HashMap::new(),
             next_id: AtomicU64::new(1),
             pending,
-            server_capabilities: Value::Null,
         })
     }
 
@@ -347,15 +343,7 @@ impl LspClient {
             }
         });
 
-        let response = self.send_request(msg)?;
-
-        self.server_capabilities = response
-            .get("result")
-            .and_then(|r| r.get("capabilities"))
-            .cloned()
-            .unwrap_or(Value::Null);
-
-        println!("Server capabilities: {}", self.server_capabilities);
+        self.send_request(msg)?;
 
         Ok(())
     }
@@ -473,48 +461,6 @@ impl LspClient {
         println!("--> {}", message);
 
         self.transport.send(&message)
-    }
-
-    // -------------------------------------------------------------
-    // Server capabilities
-    // -------------------------------------------------------------
-
-    pub fn supports_hover(&self) -> bool {
-        self.server_capabilities
-            .get("hoverProvider")
-            .map(|v| v.as_bool().unwrap_or_else(|| v.is_object()))
-            .unwrap_or(false)
-    }
-
-    pub fn supports_completion(&self) -> bool {
-        self.server_capabilities.get("completionProvider").is_some()
-    }
-
-    pub fn supports_definition(&self) -> bool {
-        self.server_capabilities
-            .get("definitionProvider")
-            .map(|v| v.as_bool().unwrap_or_else(|| v.is_object()))
-            .unwrap_or(false)
-    }
-
-    pub fn supports_signature_help(&self) -> bool {
-        self.server_capabilities
-            .get("signatureHelpProvider")
-            .is_some()
-    }
-
-    pub fn supports_rename(&self) -> bool {
-        self.server_capabilities
-            .get("renameProvider")
-            .map(|v| v.as_bool().unwrap_or_else(|| v.is_object()))
-            .unwrap_or(false)
-    }
-
-    pub fn supports_formatting(&self) -> bool {
-        self.server_capabilities
-            .get("documentFormattingProvider")
-            .map(|v| v.as_bool().unwrap_or_else(|| v.is_object()))
-            .unwrap_or(false)
     }
 
     // =============================================================
@@ -643,41 +589,6 @@ impl LspClient {
     }
 
     // -------------------------------------------------------------
-    // References
-    // -------------------------------------------------------------
-
-    pub fn references(&mut self, path: &str, line: u32, character: u32) -> Result<Value> {
-        let id = self.request_id();
-
-        let uri = Self::file_uri(path);
-
-        println!(
-            "References: uri={}, line={}, character={}",
-            uri, line, character
-        );
-
-        self.send_request(json!({
-            "jsonrpc": "2.0",
-            "id": id,
-            "method": "textDocument/references",
-            "params": {
-                "textDocument": {
-                    "uri": uri
-                },
-
-                "position": {
-                    "line": line,
-                    "character": character
-                },
-
-                "context": {
-                    "includeDeclaration": true
-                }
-            }
-        }))
-    }
-
-    // -------------------------------------------------------------
     // Formatting
     // -------------------------------------------------------------
 
@@ -703,37 +614,5 @@ impl LspClient {
                 }
             }
         }))
-    }
-
-    // -------------------------------------------------------------
-    // Shutdown
-    // -------------------------------------------------------------
-
-    pub fn shutdown(&mut self) -> Result<()> {
-        let id = self.request_id();
-
-        self.send_request(json!({
-            "jsonrpc": "2.0",
-            "id": id,
-            "method": "shutdown",
-            "params": null
-        }))?;
-
-        Ok(())
-    }
-
-    // -------------------------------------------------------------
-    // Exit
-    // -------------------------------------------------------------
-
-    pub fn exit(&mut self) -> Result<()> {
-        let message = json!({
-            "jsonrpc": "2.0",
-            "method": "exit"
-        });
-
-        println!("--> {}", message);
-
-        self.transport.send(&message)
     }
 }

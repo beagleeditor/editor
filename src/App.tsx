@@ -34,6 +34,7 @@ import CommandPalette, { type PaletteCommand } from "./components/CommandPalette
 import ExtensionsView from "./components/ExtensionsView";
 import ProblemsPanel, { type EditorProblem } from "./components/ProblemsPanel";
 import TerminalPanel from "./components/TerminalPanel";
+import { editorOptions } from "./lib/settings";
 
 import {
   attachModelSync,
@@ -148,11 +149,6 @@ const getSystemTheme = (): "dark" | "light" => {
     ? "dark"
     : "light";
 };
-
-function resolveTheme(theme: "dark" | "light" | "system") {
-  if (theme === "system") return getSystemTheme();
-  return theme;
-}
 
 /* ---------------- LANGUAGE DETECTOR ---------------- */
 
@@ -401,6 +397,7 @@ export default function App() {
   const [sidebarVisible, setSidebarVisible] = useState(true);
 
   const [sidebarWidth, setSidebarWidth] = useState(280);
+  const sidebarWidthRef = useRef(280);
 
   const resizingRef = useRef(false);
   const startX = useRef(0);
@@ -563,6 +560,19 @@ export default function App() {
   const [booting, setBooting] = useState(true);
 
   const { settings, update } = useSettings();
+  const [systemTheme, setSystemTheme] = useState<"dark" | "light">(getSystemTheme);
+
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = () => setSystemTheme(media.matches ? "dark" : "light");
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
+
+  useEffect(() => {
+    sidebarWidthRef.current = settings.sidebarWidth;
+    setSidebarWidth(settings.sidebarWidth);
+  }, [settings.sidebarWidth]);
 
   const [quickOpenVisible, setQuickOpenVisible] = useState(false);
   const [commandPaletteVisible, setCommandPaletteVisible] = useState(false);
@@ -591,7 +601,7 @@ export default function App() {
     store.save();
   }, [sidebarWidth, store]);
 
-  const theme = resolveTheme(settings.theme);
+  const theme = settings.theme === "system" ? systemTheme : settings.theme;
 
   /* ---------------- FILE SYSTEM ---------------- */
 
@@ -1040,25 +1050,12 @@ export default function App() {
 
   useEffect(() => {
     if (!editorRef.current || !settings) return;
-
-    editorRef.current.updateOptions({
-      fontSize: settings.fontSize,
-      fontFamily: settings.fontFamily,
-      lineHeight: settings.lineHeight,
-      lineNumbers: settings.lineNumbers,
-      renderWhitespace: settings.renderWhitespace ? "all" : "none",
-      renderLineHighlight: settings.highlightCurrentLine ? "line" : "none",
-      cursorStyle: settings.cursorStyle,
-      cursorBlinking: settings.cursorBlinking,
-      tabSize: settings.tabSize,
-      wordWrap: settings.wordWrap ? "on" : "off",
-      minimap: {
-        enabled: settings.minimap,
-      },
-      cursorSmoothCaretAnimation: settings.cursorSmoothCaretAnimation
-        ? "on"
-        : "off",
-    });
+    editorRef.current.updateOptions(editorOptions(settings));
+    const model = editorRef.current.getModel();
+    if (model) {
+      if (settings.detectIndentation) model.detectIndentation(settings.insertSpaces, settings.tabSize);
+      else model.updateOptions({ insertSpaces: settings.insertSpaces, tabSize: settings.tabSize });
+    }
   }, [settings]);
 
   useEffect(() => {
@@ -1160,10 +1157,15 @@ export default function App() {
       if (!resizingRef.current) return;
 
       const dx = e.clientX - startX.current;
-      setSidebarWidth(Math.max(180, Math.min(500, startWidth.current + dx)));
+      const nextWidth = Math.max(180, Math.min(500, startWidth.current + dx));
+      sidebarWidthRef.current = nextWidth;
+      setSidebarWidth(nextWidth);
     };
 
     const up = () => {
+      if (resizingRef.current) {
+        update("sidebarWidth", sidebarWidthRef.current);
+      }
       resizingRef.current = false;
     };
 
@@ -1174,7 +1176,7 @@ export default function App() {
       window.removeEventListener("mousemove", move);
       window.removeEventListener("mouseup", up);
     };
-  }, []);
+  }, [update]);
 
   useEffect(() => {
     const editor = editorInstance;
@@ -1727,24 +1729,8 @@ export default function App() {
                         }
                         options={{
                           automaticLayout: true,
-                          minimap: { enabled: settings?.minimap ?? true },
+                          ...editorOptions(settings),
                           scrollBeyondLastLine: false,
-                          fontSize: Math.max(10, settings?.fontSize ?? 14),
-                          fontFamily: settings?.fontFamily,
-                          lineHeight: settings?.lineHeight,
-                          lineNumbers: settings?.lineNumbers,
-                          renderWhitespace: settings?.renderWhitespace
-                            ? "all"
-                            : "none",
-                          renderLineHighlight: settings?.highlightCurrentLine
-                            ? "line"
-                            : "none",
-                          cursorStyle: settings?.cursorStyle,
-                          cursorBlinking: settings?.cursorBlinking,
-                          tabSize: settings?.tabSize ?? 2,
-                          wordWrap: settings?.wordWrap ? "on" : "off",
-                          cursorSmoothCaretAnimation:
-                            settings?.cursorSmoothCaretAnimation ? "on" : "off",
                         }}
                       />
                     </div>
@@ -1886,28 +1872,11 @@ export default function App() {
                 theme={theme === "dark" ? "beagle-dark" : "beagle-light"}
                 options={{
                   automaticLayout: true,
-                  minimap: {
-                    enabled: settings?.minimap ?? true,
-                  },
+                  ...editorOptions(settings),
                   scrollBeyondLastLine: false,
                   tabCompletion: "on",
-                  quickSuggestions: true,
                   contextmenu: true,
                   copyWithSyntaxHighlighting: true,
-                  fontSize: Math.max(10, settings?.fontSize ?? 14),
-                  fontFamily: settings?.fontFamily,
-                  lineHeight: settings?.lineHeight,
-                  lineNumbers: settings?.lineNumbers,
-                  renderWhitespace: settings?.renderWhitespace ? "all" : "none",
-                  renderLineHighlight: settings?.highlightCurrentLine
-                    ? "line"
-                    : "none",
-                  cursorStyle: settings?.cursorStyle,
-                  cursorBlinking: settings?.cursorBlinking,
-                  tabSize: settings?.tabSize ?? 2,
-                  wordWrap: settings?.wordWrap ? "on" : "off",
-                  cursorSmoothCaretAnimation:
-                    settings?.cursorSmoothCaretAnimation ? "on" : "off",
                 }}
               />
             )}

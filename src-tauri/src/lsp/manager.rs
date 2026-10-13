@@ -57,8 +57,4 @@ impl LspManager {
         let language = self.path_languages.get(path)?.clone();
         self.clients.get_mut(&language)
     }
-
-    pub fn language_for_path(&self, path: &str) -> Option<&str> {
-        self.path_languages.get(path).map(String::as_str)
-    }
 }

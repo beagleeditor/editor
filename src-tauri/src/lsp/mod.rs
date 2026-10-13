@@ -1,14 +1,12 @@
 mod client;
 mod manager;
-mod protocol;
-mod server;
 mod transport;
 
 use client::LspClient;
 use manager::LSP_MANAGER;
 
 use serde_json::Value;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::path::Path;
 use std::sync::{LazyLock, Mutex};
 
@@ -19,9 +17,6 @@ static INITIALIZED_LANGUAGES: LazyLock<Mutex<HashSet<String>>> =
 // incorrectly prevents TypeScript from opening a file previously opened by Pyright.
 static OPEN_DOCUMENTS: LazyLock<Mutex<HashSet<(String, String)>>> =
     LazyLock::new(|| Mutex::new(HashSet::new()));
-
-static WORKSPACES: LazyLock<Mutex<HashMap<String, String>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 static WORKSPACE_ROOT: std::sync::LazyLock<std::sync::Mutex<Option<String>>> =
     std::sync::LazyLock::new(|| std::sync::Mutex::new(None));
@@ -147,9 +142,6 @@ pub fn lsp_start(app: tauri::AppHandle, language: String) -> Result<(), String> 
         }
     }
 
-    let language_for_thread = language.clone();
-    let workspace_for_thread = workspace.clone();
-
     let mut manager = LSP_MANAGER.lock().unwrap();
 
     let client = manager.get_client_mut(&language).ok_or("No client")?;
@@ -194,7 +186,7 @@ pub fn lsp_open(path: String, language: String, text: String) {
     println!("========================================");
 
     {
-        let mut open_docs = OPEN_DOCUMENTS.lock().unwrap();
+        let open_docs = OPEN_DOCUMENTS.lock().unwrap();
 
         let key = (path.clone(), language.clone());
         if open_docs.contains(&key) {

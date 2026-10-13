@@ -71,8 +71,7 @@ pub fn fuzzy_find(root: String, query: String) -> Vec<FileEntry> {
 
         let full_path = path.to_string_lossy();
 
-        let score = fuzzy_score(&query, &name)
-            .or_else(|| fuzzy_score(&query, &full_path));
+        let score = fuzzy_score(&query, &name).or_else(|| fuzzy_score(&query, &full_path));
 
         if let Some(score) = score {
             results.push((
@@ -86,9 +85,9 @@ pub fn fuzzy_find(root: String, query: String) -> Vec<FileEntry> {
     }
 
     if query.trim().is_empty() {
-        results.sort_by(|a, b| a.1.name.to_lowercase().cmp(&b.1.name.to_lowercase()));
+        results.sort_by_key(|a| a.1.name.to_lowercase());
     } else {
-        results.sort_by(|a, b| b.0.cmp(&a.0));
+        results.sort_by_key(|a| std::cmp::Reverse(a.0));
     }
 
     results.truncate(100);

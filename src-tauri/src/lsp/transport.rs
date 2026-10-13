@@ -7,7 +7,7 @@ use serde::Serialize;
 use serde_json::Value;
 
 pub struct Transport {
-    child: Child,
+    _child: Child,
     reader: Arc<Mutex<BufReader<ChildStdout>>>,
     writer: Arc<Mutex<BufWriter<ChildStdin>>>,
 }
@@ -30,7 +30,7 @@ impl Transport {
             writer: Arc::new(Mutex::new(BufWriter::new(
                 child.stdin.take().ok_or_else(|| anyhow!("missing stdin"))?,
             ))),
-            child,
+            _child: child,
         })
     }
 
@@ -70,10 +70,5 @@ impl Transport {
         let mut body = vec![0; len];
         reader.read_exact(&mut body)?;
         Ok(serde_json::from_slice(&body)?)
-    }
-
-    pub fn kill(&mut self) -> Result<()> {
-        self.child.kill()?;
-        Ok(())
     }
 }

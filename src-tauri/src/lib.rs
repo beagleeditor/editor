@@ -14,8 +14,8 @@ use fs::{
     rename_path, reveal_in_finder, start_watch, write_file,
 };
 use lsp::{
-    lsp_change, lsp_completion, lsp_definition, lsp_hover, lsp_is_initialized, lsp_open, lsp_save,
-    lsp_format, lsp_signature_help, lsp_start, lsp_stop,
+    lsp_change, lsp_completion, lsp_definition, lsp_format, lsp_hover, lsp_is_initialized,
+    lsp_open, lsp_save, lsp_signature_help, lsp_start, lsp_stop,
 };
 use search::search_workspace;
 
@@ -39,13 +39,12 @@ pub fn run() {
             let quit =
                 MenuItem::with_id(app, "quit", "Quit BeagleEditor", true, Some("CmdOrCtrl+Q"))?;
 
-            let file_menu =
-                Submenu::with_items(
-                    app,
-                    "File",
-                    true,
-                    &[&open, &openfolder, &closefolder, &save, &quit],
-                )?;
+            let file_menu = Submenu::with_items(
+                app,
+                "File",
+                true,
+                &[&open, &openfolder, &closefolder, &save, &quit],
+            )?;
 
             // APP INFO MENU (works everywhere, macOS just relocates it visually)
             let about = MenuItem::with_id(app, "about", "About BeagleEditor", true, None::<&str>)?;

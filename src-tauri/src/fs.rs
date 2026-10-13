@@ -2,10 +2,10 @@ use serde::Serialize;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use notify::{Watcher, RecursiveMode, recommended_watcher};
+use notify::{recommended_watcher, RecursiveMode, Watcher};
+use serde::Deserialize;
 use std::sync::mpsc::channel;
 use tauri::{Emitter, Manager};
-use serde::Deserialize;
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -27,28 +27,66 @@ pub struct InstalledExtension {
 
 #[tauri::command]
 pub fn list_extensions(app: tauri::AppHandle) -> Result<Vec<InstalledExtension>, String> {
-    let base = app.path().app_config_dir().map_err(|e| e.to_string())?.join("extensions");
+    let base = app
+        .path()
+        .app_config_dir()
+        .map_err(|e| e.to_string())?
+        .join("extensions");
     fs::create_dir_all(&base).map_err(|e| e.to_string())?;
     let mut extensions = Vec::new();
 
     for item in fs::read_dir(&base).map_err(|e| e.to_string())?.flatten() {
-        if !item.file_type().map(|t| t.is_dir()).unwrap_or(false) { continue; }
+        if !item.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+            continue;
+        }
         let manifest_path = item.path().join("manifest.json");
-        let manifest_text = match fs::read_to_string(&manifest_path) { Ok(text) => text, Err(_) => continue };
-        let manifest: ExtensionManifest = match serde_json::from_str(&manifest_text) { Ok(value) => value, Err(_) => continue };
-        if !valid_extension_id(&manifest.id) || manifest.name.trim().is_empty() || manifest.version.trim().is_empty() { continue; }
+        let manifest_text = match fs::read_to_string(&manifest_path) {
+            Ok(text) => text,
+            Err(_) => continue,
+        };
+        let manifest: ExtensionManifest = match serde_json::from_str(&manifest_text) {
+            Ok(value) => value,
+            Err(_) => continue,
+        };
+        if !valid_extension_id(&manifest.id)
+            || manifest.name.trim().is_empty()
+            || manifest.version.trim().is_empty()
+        {
+            continue;
+        }
         // The manifest ID is also the installed directory name. Enforce this so
         // removal and enabled-state preferences always target the same extension.
-        if item.file_name().to_str() != Some(manifest.id.as_str()) { continue; }
+        if item.file_name().to_str() != Some(manifest.id.as_str()) {
+            continue;
+        }
         let entry_name = manifest.main.as_deref().unwrap_or("main.js");
         let entry_path = item.path().join(entry_name);
         // Keep the entry point inside the extension directory.
-        if entry_path.parent() != Some(item.path().as_path()) || !entry_path.is_file() { continue; }
-        if extensions.iter().any(|extension: &InstalledExtension| extension.manifest.id == manifest.id) { continue; }
-        let entry = match fs::read_to_string(&entry_path) { Ok(source) => source, Err(_) => continue };
-        extensions.push(InstalledExtension { manifest, entry, path: item.path().to_string_lossy().into_owned() });
+        if entry_path.parent() != Some(item.path().as_path()) || !entry_path.is_file() {
+            continue;
+        }
+        if extensions
+            .iter()
+            .any(|extension: &InstalledExtension| extension.manifest.id == manifest.id)
+        {
+            continue;
+        }
+        let entry = match fs::read_to_string(&entry_path) {
+            Ok(source) => source,
+            Err(_) => continue,
+        };
+        extensions.push(InstalledExtension {
+            manifest,
+            entry,
+            path: item.path().to_string_lossy().into_owned(),
+        });
     }
-    extensions.sort_by(|a, b| a.manifest.name.to_lowercase().cmp(&b.manifest.name.to_lowercase()));
+    extensions.sort_by(|a, b| {
+        a.manifest
+            .name
+            .to_lowercase()
+            .cmp(&b.manifest.name.to_lowercase())
+    });
     Ok(extensions)
 }
 
@@ -56,12 +94,18 @@ fn valid_extension_id(id: &str) -> bool {
     !id.trim().is_empty()
         && id != "."
         && id != ".."
-        && id.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
 }
 
 #[tauri::command]
 pub fn extensions_directory(app: tauri::AppHandle) -> Result<String, String> {
-    let path = app.path().app_config_dir().map_err(|e| e.to_string())?.join("extensions");
+    let path = app
+        .path()
+        .app_config_dir()
+        .map_err(|e| e.to_string())?
+        .join("extensions");
     fs::create_dir_all(&path).map_err(|e| e.to_string())?;
     Ok(path.to_string_lossy().into_owned())
 }
@@ -78,31 +122,55 @@ pub fn install_extension(app: tauri::AppHandle, source: String) -> Result<String
         .map_err(|_| "The selected folder must contain a manifest.json file.".to_string())?;
     let manifest: ExtensionManifest = serde_json::from_str(&manifest_text)
         .map_err(|e| format!("Invalid extension manifest: {e}"))?;
-    if manifest.id.trim().is_empty() || manifest.name.trim().is_empty() || manifest.version.trim().is_empty() {
-        return Err("The extension manifest must include a non-empty id, name, and version.".into());
+    if manifest.id.trim().is_empty()
+        || manifest.name.trim().is_empty()
+        || manifest.version.trim().is_empty()
+    {
+        return Err(
+            "The extension manifest must include a non-empty id, name, and version.".into(),
+        );
     }
     if !valid_extension_id(&manifest.id) {
-        return Err("Extension id may contain only letters, numbers, dots, hyphens, and underscores.".into());
+        return Err(
+            "Extension id may contain only letters, numbers, dots, hyphens, and underscores."
+                .into(),
+        );
     }
 
     let entry_name = manifest.main.as_deref().unwrap_or("main.js");
     let entry_path = Path::new(entry_name);
-    if entry_path.components().count() != 1 || entry_path.file_name().and_then(|s| s.to_str()) != Some(entry_name) {
-        return Err("The extension entry point must be a file directly inside the extension folder.".into());
+    if entry_path.components().count() != 1
+        || entry_path.file_name().and_then(|s| s.to_str()) != Some(entry_name)
+    {
+        return Err(
+            "The extension entry point must be a file directly inside the extension folder.".into(),
+        );
     }
     if !source.join(entry_name).is_file() {
-        return Err(format!("The extension entry point '{entry_name}' was not found."));
+        return Err(format!(
+            "The extension entry point '{entry_name}' was not found."
+        ));
     }
 
-    let base = app.path().app_config_dir().map_err(|e| e.to_string())?.join("extensions");
+    let base = app
+        .path()
+        .app_config_dir()
+        .map_err(|e| e.to_string())?
+        .join("extensions");
     fs::create_dir_all(&base).map_err(|e| e.to_string())?;
     let destination = base.join(&manifest.id);
     if destination.exists() {
-        return Err(format!("An extension with id '{}' is already installed. Remove it before reinstalling.", manifest.id));
+        return Err(format!(
+            "An extension with id '{}' is already installed. Remove it before reinstalling.",
+            manifest.id
+        ));
     }
 
     copy_extension_tree(&source, &destination)?;
-    Ok(format!("Installed {} v{}.", manifest.name, manifest.version))
+    Ok(format!(
+        "Installed {} v{}.",
+        manifest.name, manifest.version
+    ))
 }
 
 #[tauri::command]
@@ -110,14 +178,19 @@ pub fn remove_extension(app: tauri::AppHandle, id: String) -> Result<String, Str
     if !valid_extension_id(&id) {
         return Err("Invalid extension id.".into());
     }
-    let base = app.path().app_config_dir().map_err(|e| e.to_string())?.join("extensions");
+    let base = app
+        .path()
+        .app_config_dir()
+        .map_err(|e| e.to_string())?
+        .join("extensions");
     let destination = base.join(&id);
     let metadata = fs::symlink_metadata(&destination)
         .map_err(|_| format!("Extension '{id}' is not installed."))?;
     if !metadata.file_type().is_dir() {
         return Err("The extension path is not a directory.".into());
     }
-    fs::remove_dir_all(&destination).map_err(|e| format!("Could not remove extension '{id}': {e}"))?;
+    fs::remove_dir_all(&destination)
+        .map_err(|e| format!("Could not remove extension '{id}': {e}"))?;
     Ok(format!("Removed extension '{id}'."))
 }
 
@@ -159,7 +232,6 @@ pub struct FileNode {
 /// SAFE PATH NORMALIZER
 /// -----------------------------------------------------
 /// Prevents weird path issues + keeps consistency across OSes
-
 fn normalize_path(path: &str) -> PathBuf {
     PathBuf::from(path)
 }
@@ -179,8 +251,10 @@ pub fn read_dir(path: String) -> Result<Vec<FileNode>, String> {
     let mut result: Vec<FileNode> = Vec::new();
 
     for entry in entries {
-        let entry = entry.map_err(|e| format!("Failed to read an entry in {}: {e}", path.display()))?;
-        let file_type = entry.file_type()
+        let entry =
+            entry.map_err(|e| format!("Failed to read an entry in {}: {e}", path.display()))?;
+        let file_type = entry
+            .file_type()
             .map_err(|e| format!("Failed to inspect {}: {e}", entry.path().display()))?;
 
         let name = entry.file_name().to_string_lossy().to_string();
@@ -256,7 +330,10 @@ pub fn write_file(path: String, content: String) -> Result<(), String> {
         .unwrap_or_else(|| Path::new("."));
 
     if !parent.is_dir() {
-        return Err(format!("Cannot save file: parent directory does not exist: {}", parent.display()));
+        return Err(format!(
+            "Cannot save file: parent directory does not exist: {}",
+            parent.display()
+        ));
     }
 
     let existing = match fs::symlink_metadata(destination) {
@@ -275,14 +352,20 @@ pub fn write_file(path: String, content: String) -> Result<(), String> {
     let mut temporary = tempfile::NamedTempFile::new_in(parent)
         .map_err(|e| format!("Could not create temporary save file: {e}"))?;
     if let Some(metadata) = existing {
-        temporary.as_file().set_permissions(metadata.permissions())
+        temporary
+            .as_file()
+            .set_permissions(metadata.permissions())
             .map_err(|e| format!("Could not preserve file permissions: {e}"))?;
     }
-    temporary.write_all(content.as_bytes())
+    temporary
+        .write_all(content.as_bytes())
         .map_err(|e| format!("Could not write temporary save file: {e}"))?;
-    temporary.as_file().sync_all()
+    temporary
+        .as_file()
+        .sync_all()
         .map_err(|e| format!("Could not flush temporary save file: {e}"))?;
-    temporary.persist(destination)
+    temporary
+        .persist(destination)
         .map_err(|e| format!("Could not replace file safely: {}", e.error))?;
     Ok(())
 }
@@ -299,7 +382,10 @@ pub fn create_file(path: String) -> Result<(), String> {
     }
     if let Some(parent) = p.parent().filter(|parent| !parent.as_os_str().is_empty()) {
         if !parent.is_dir() {
-            return Err(format!("Parent directory does not exist: {}", parent.display()));
+            return Err(format!(
+                "Parent directory does not exist: {}",
+                parent.display()
+            ));
         }
     }
 
@@ -318,7 +404,8 @@ pub fn create_dir(path: String) -> Result<(), String> {
     if path.file_name().is_none() {
         return Err("Cannot create a directory at a filesystem root.".into());
     }
-    fs::create_dir(path).map_err(|e| format!("Could not create directory without replacing an existing path: {e}"))
+    fs::create_dir(path)
+        .map_err(|e| format!("Could not create directory without replacing an existing path: {e}"))
 }
 
 #[tauri::command]
@@ -328,7 +415,8 @@ pub fn delete_path(path: String) -> Result<(), String> {
 
     let p = Path::new(&path);
 
-    let metadata = fs::symlink_metadata(p).map_err(|e| format!("Could not inspect delete target: {e}"))?;
+    let metadata =
+        fs::symlink_metadata(p).map_err(|e| format!("Could not inspect delete target: {e}"))?;
     if p.file_name().is_none() {
         return Err("Refusing to delete a filesystem root.".into());
     }
@@ -357,17 +445,24 @@ pub fn rename_path(old_path: String, new_path: String) -> Result<(), String> {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
         Err(error) => return Err(format!("Could not inspect rename destination: {error}")),
     }
-    let parent = new.parent().filter(|parent| !parent.as_os_str().is_empty()).unwrap_or_else(|| Path::new("."));
+    let parent = new
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
     if !parent.is_dir() {
         return Err("Rename destination parent directory does not exist.".into());
     }
-    let old_parent = old.parent().filter(|parent| !parent.as_os_str().is_empty()).unwrap_or_else(|| Path::new("."));
+    let old_parent = old
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
     let old_parent_canonical = fs::canonicalize(old_parent).map_err(|e| e.to_string())?;
     let parent_canonical = fs::canonicalize(parent).map_err(|e| e.to_string())?;
     if old_parent_canonical != parent_canonical {
         return Err("Rename must stay in the same directory.".into());
     }
-    fs::rename(old, new).map_err(|e| format!("Could not rename without replacing an existing path: {e}"))
+    fs::rename(old, new)
+        .map_err(|e| format!("Could not rename without replacing an existing path: {e}"))
 }
 
 #[cfg(test)]
@@ -409,7 +504,9 @@ mod file_operation_tests {
             let link = temp.path().join("link.txt");
             fs::write(&target, "untouched").unwrap();
             symlink(&target, &link).unwrap();
-            assert!(write_file(link.to_string_lossy().into_owned(), "bad overwrite".into()).is_err());
+            assert!(
+                write_file(link.to_string_lossy().into_owned(), "bad overwrite".into()).is_err()
+            );
             assert_eq!(fs::read_to_string(target).unwrap(), "untouched");
         }
     }
@@ -439,13 +536,21 @@ mod file_operation_tests {
         let destination = temp.path().join("destination.txt");
         fs::write(&source, "source").unwrap();
         fs::write(&destination, "destination").unwrap();
-        assert!(rename_path(source.to_string_lossy().into_owned(), destination.to_string_lossy().into_owned()).is_err());
+        assert!(rename_path(
+            source.to_string_lossy().into_owned(),
+            destination.to_string_lossy().into_owned()
+        )
+        .is_err());
         assert_eq!(fs::read_to_string(&source).unwrap(), "source");
         assert_eq!(fs::read_to_string(&destination).unwrap(), "destination");
 
         let other = temp.path().join("other");
         fs::create_dir(&other).unwrap();
-        assert!(rename_path(source.to_string_lossy().into_owned(), other.join("moved.txt").to_string_lossy().into_owned()).is_err());
+        assert!(rename_path(
+            source.to_string_lossy().into_owned(),
+            other.join("moved.txt").to_string_lossy().into_owned()
+        )
+        .is_err());
     }
 }
 
@@ -483,25 +588,24 @@ pub fn reveal_in_finder(path: String) -> Result<(), String> {
 }
 
 fn watch_folder(app: tauri::AppHandle, path: String) {
-  std::thread::spawn(move || {
-    let (tx, rx) = channel();
+    std::thread::spawn(move || {
+        let (tx, rx) = channel();
 
-    let mut watcher = recommended_watcher(tx).unwrap();
+        let mut watcher = recommended_watcher(tx).unwrap();
 
-    watcher.watch(&path.as_ref(), RecursiveMode::Recursive).unwrap();
+        watcher
+            .watch(path.as_ref(), RecursiveMode::Recursive)
+            .unwrap();
 
-    for res in rx {
-      match res {
-        Ok(_event) => {
-          let _ = app.emit("fs-changed", {});
+        for res in rx {
+            if res.is_ok() {
+                let _ = app.emit("fs-changed", ());
+            }
         }
-        Err(_) => {}
-      }
-    }
-  });
+    });
 }
 
 #[tauri::command]
 pub fn start_watch(app: tauri::AppHandle, path: String) {
-  watch_folder(app, path);
+    watch_folder(app, path);
 }

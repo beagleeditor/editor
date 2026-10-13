@@ -8,6 +8,19 @@ const host = process.env.TAURI_DEV_HOST;
 export default defineConfig(async () => ({
   plugins: [react()],
 
+  build: {
+    // Monaco's editor runtime and language support are intentionally bundled
+    // together; keep Vite's warning threshold above that known vendor chunk.
+    chunkSizeWarningLimit: 5000,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("/node_modules/monaco-editor/")) return "monaco-editor";
+        },
+      },
+    },
+  },
+
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors
