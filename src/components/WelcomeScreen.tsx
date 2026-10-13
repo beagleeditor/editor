@@ -1,4 +1,14 @@
 import { Clock3, FilePlus2, FolderOpen, Folder, ArrowUpRight, Code2, Keyboard } from "lucide-react";
+import { useEffect, useState } from "react";
+
+const tips = [
+  { title: "Quick Open", detail: "Jump to a file without leaving the keyboard.", shortcut: "⌘ P", icon: <Keyboard size={19} /> },
+  { title: "Toggle the sidebar", detail: "Give your editor more room whenever you need it.", shortcut: "⌘ B", icon: <FolderOpen size={19} /> },
+  { title: "Command Palette", detail: "Find editor commands and actions from one place.", shortcut: "⌘ ⇧ P", icon: <Code2 size={19} /> },
+  { title: "Save as you work", detail: "Save the current file with a familiar shortcut.", shortcut: "⌘ S", icon: <FilePlus2 size={19} /> },
+  { title: "Reopen your workspace", detail: "Your last folder is restored when BeagleEditor starts.", shortcut: "WORKSPACES", icon: <Folder size={19} /> },
+  { title: "Make it yours", detail: "Explore Settings to adjust BeagleEditor to your workflow.", shortcut: "SETTINGS", icon: <Keyboard size={19} /> },
+];
 
 type Props = {
   onOpen: () => void;
@@ -9,6 +19,17 @@ type Props = {
 };
 
 export default function WelcomeScreen({ onOpen, onNewFile, onOpenFolder, recentFolders, onOpenRecentFolder }: Props) {
+  const [tipIndex, setTipIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setTipIndex((current) => (current + 1) % tips.length);
+    }, 7000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const nextTip = () => setTipIndex((current) => (current + 1) % tips.length);
+
   return (
     <div className="welcome">
       <div className="welcome-layout">
@@ -41,10 +62,19 @@ export default function WelcomeScreen({ onOpen, onNewFile, onOpenFolder, recentF
           )}
         </section>
 
-        <section className="welcome-tips">
-          <div><Keyboard size={17} /><span><strong>Quick Open</strong><small>Jump to a file with ⌘ P</small></span></div>
-          <div><FolderOpen size={17} /><span><strong>Toggle Sidebar</strong><small>Show or hide the sidebar with ⌘ B</small></span></div>
-          <div><Code2 size={17} /><span><strong>Built for focus</strong><small>Editing, search, source control, and extensions.</small></span></div>
+        <section className="welcome-tip-section" aria-live="polite">
+          <div className="welcome-tip-heading"><h2>TIP OF THE MOMENT</h2><span>{String(tipIndex + 1).padStart(2, "0")} / {String(tips.length).padStart(2, "0")}</span></div>
+          <div className="welcome-tip-card" key={tipIndex}>
+            <div className="welcome-tip-icon">{tips[tipIndex].icon}</div>
+            <div className="welcome-tip-copy"><strong>{tips[tipIndex].title}</strong><p>{tips[tipIndex].detail}</p></div>
+            <kbd>{tips[tipIndex].shortcut}</kbd>
+          </div>
+          <div className="welcome-tip-footer">
+            <div className="welcome-tip-dots" aria-label="Choose a tip">
+              {tips.map((tip, index) => <button key={tip.title} className={index === tipIndex ? "active" : ""} aria-label={`Show tip ${index + 1}: ${tip.title}`} aria-current={index === tipIndex ? "step" : undefined} onClick={() => setTipIndex(index)} />)}
+            </div>
+            <button className="welcome-tip-next" onClick={nextTip}>Next tip <ArrowUpRight size={14} /></button>
+          </div>
         </section>
       </div>
     </div>

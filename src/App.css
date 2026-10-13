@@ -1336,13 +1336,25 @@ body {
 .welcome-recent-item > span { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
 .welcome-recent-item strong { font-size: 13px; font-weight: 600; }
 .welcome-recent-item small { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.welcome-tips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; border-top: 1px solid var(--border); padding-top: 20px; }
-.welcome-tips > div { display: flex; align-items: flex-start; gap: 10px; color: var(--muted); }
-.welcome-tips > div > svg { flex: 0 0 auto; margin-top: 2px; }
-.welcome-tips span { display: flex; flex-direction: column; gap: 5px; }
-.welcome-tips strong { color: var(--text); font-size: 12px; }
-.welcome-tips small { font-size: 11px; line-height: 1.5; }
-@media (max-width: 700px) { .welcome-tips { grid-template-columns: 1fr; } .welcome-layout { padding: 24px 0; gap: 28px; } }
+.welcome-tip-section { border-top: 1px solid var(--border); padding-top: 18px; }
+.welcome-tip-heading, .welcome-tip-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.welcome-tip-heading h2 { margin: 0; color: var(--muted); font-size: 10px; letter-spacing: .13em; font-weight: 700; }
+.welcome-tip-heading > span { color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.welcome-tip-card { min-height: 76px; display: flex; align-items: center; gap: 14px; padding: 18px 0 14px; animation: welcome-tip-in .22s ease-out; }
+.welcome-tip-icon { width: 38px; height: 38px; flex: 0 0 auto; display: grid; place-items: center; color: var(--accent); background: var(--surface); border: 1px solid var(--border); }
+.welcome-tip-copy { flex: 1; min-width: 0; }
+.welcome-tip-copy strong { color: var(--text); font-size: 13px; }
+.welcome-tip-copy p { margin: 5px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.welcome-tip-card kbd { padding: 5px 7px; border: 1px solid var(--border); color: var(--muted); font: 10px ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
+.welcome-tip-footer { padding-top: 4px; }
+.welcome-tip-dots { display: flex; align-items: center; gap: 6px; }
+.welcome-tip-dots button { width: 6px; height: 6px; padding: 0; border: 0; border-radius: 50%; background: var(--border); cursor: pointer; }
+.welcome-tip-dots button.active { width: 18px; border-radius: 4px; background: var(--accent); }
+.welcome .welcome-tip-next { display: inline-flex; align-items: center; gap: 5px; margin: 0; padding: 6px 0 6px 8px; border: 0; background: transparent; color: var(--muted); font-size: 11px; font-weight: 500; }
+.welcome .welcome-tip-next:hover { color: var(--text); }
+@keyframes welcome-tip-in { from { opacity: .5; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .welcome-tip-card { animation: none; } }
+@media (max-width: 700px) { .welcome-layout { padding: 24px 0; gap: 28px; } .welcome-tip-card { align-items: flex-start; flex-wrap: wrap; } .welcome-tip-card kbd { margin-left: 52px; } }
 
 .context-menu {
   min-width: 180px;
