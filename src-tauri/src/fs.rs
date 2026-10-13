@@ -255,7 +255,7 @@ pub fn write_file(path: String, content: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn create_file(path: String) -> Result<(), String> {
-    use std::fs;
+    use std::fs::OpenOptions;
     use std::path::Path;
 
     let p = Path::new(&path);
@@ -264,7 +264,11 @@ pub fn create_file(path: String) -> Result<(), String> {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
 
-    fs::File::create(p).map_err(|e| e.to_string())?;
+    OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(p)
+        .map_err(|e| format!("Could not create file without overwriting an existing path: {e}"))?;
 
     Ok(())
 }

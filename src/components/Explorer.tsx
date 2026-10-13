@@ -13,7 +13,7 @@ type Props = {
   onReload: () => Promise<void>;
   onNewFile: (path: string) => void;
   onNewFolder: (path: string) => void;
-  showCreateDialog: (type: "file" | "folder") => void;
+  showCreateDialog: (type: "file" | "folder", parentPath?: string) => void;
   onOpenFolder: () => void;
   onCloseFolder: () => void;
   onRename?: (path: string) => void;
@@ -102,6 +102,12 @@ export default function Explorer({
 
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // A successful workspace reload replaces the tree object. Remount the lazy
+  // tree nodes so their cached directory listings cannot outlive that snapshot.
+  useEffect(() => {
+    setRefreshKey((value) => value + 1);
+  }, [tree]);
+
   useEffect(() => {
     if (!onReload) return;
 
@@ -110,7 +116,6 @@ export default function Explorer({
     (async () => {
       unlisten = await listen("fs-changed", async () => {
         await onReload();
-        setRefreshKey((v) => v + 1);
       });
     })();
 
@@ -137,7 +142,7 @@ export default function Explorer({
             <button
               className="explorer-action-btn"
               title="New File"
-              onClick={() => showCreateDialog("file")}
+              onClick={() => showCreateDialog("file", tree?.path)}
             >
               <Icon icon="mdi:file-plus-outline" width="16" />
             </button>
@@ -145,7 +150,7 @@ export default function Explorer({
             <button
               className="explorer-action-btn"
               title="New Folder"
-              onClick={() => showCreateDialog("folder")}
+              onClick={() => showCreateDialog("folder", tree?.path)}
             >
               <Icon icon="mdi:folder-plus-outline" width="16" />
             </button>
@@ -155,7 +160,6 @@ export default function Explorer({
             title="Reload"
             onClick={async () => {
               await onReload?.();
-              setRefreshKey((v) => v + 1);
             }}
             >
               <Icon icon="mdi:refresh" width="16" />
@@ -200,7 +204,7 @@ export default function Explorer({
               <button
                 className="context-menu-item"
                 onClick={() => {
-                  showCreateDialog("file");
+                  showCreateDialog("file", contextMenu.path);
                   setContextMenu(null);
                 }}
               >
@@ -210,7 +214,7 @@ export default function Explorer({
               <button
                 className="context-menu-item"
                 onClick={() => {
-                  showCreateDialog("folder");
+                  showCreateDialog("folder", contextMenu.path);
                   setContextMenu(null);
                 }}
               >
@@ -313,7 +317,6 @@ function TreeNode({
   ----------------------------------------------------- */
 
   const handleClick = async () => {
-    console.log(node);
     // FILE → open editor
     if (!isDir) {
       onOpenFile(node.path);

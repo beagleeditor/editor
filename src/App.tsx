@@ -32,6 +32,8 @@ import Dialog from "./components/Dialog";
 import QuickOpen from "./components/QuickOpen";
 import CommandPalette, { type PaletteCommand } from "./components/CommandPalette";
 import ExtensionsView from "./components/ExtensionsView";
+import ProblemsPanel, { type EditorProblem } from "./components/ProblemsPanel";
+import TerminalPanel from "./components/TerminalPanel";
 
 import {
   attachModelSync,
@@ -594,6 +596,9 @@ export default function App() {
   /* ---------------- FILE SYSTEM ---------------- */
 
   const [workspaceDir, setWorkspaceDir] = useState<string | null>(null);
+  const [bottomPanel, setBottomPanel] = useState<"problems" | "terminal" | null>(null);
+  const [terminalPanelCreated, setTerminalPanelCreated] = useState(false);
+  const [diagnosticsByPath, setDiagnosticsByPath] = useState<Record<string, EditorProblem[]>>({});
   const [fileTree, setFileTree] = useState<FileNode | null>(null);
   const [recentFolders, setRecentFolders] = useState<string[]>(() => {
     try {
@@ -777,7 +782,10 @@ export default function App() {
       }
     }
 
-    await fsAPI.writeFile(path, activeTab.content);
+    // Save a stable snapshot. If the user keeps typing while the write is in
+    // flight, preserve the newer buffer as dirty instead of marking it saved.
+    const savedContent = activeTab.content;
+    await fsAPI.writeFile(path, savedContent);
 
     const fileName = path.split(/[/\\]/).pop() ?? activeTab.name;
 
@@ -789,7 +797,7 @@ export default function App() {
               path,
               name: fileName,
               language: detectLanguage(fileName),
-              dirty: false,
+              dirty: t.content !== savedContent,
             }
           : t,
       ),
@@ -1051,30 +1059,34 @@ export default function App() {
     const setup = async () => {
       const dispose = await listenDiagnostics((payload) => {
         const uri = monaco.Uri.parse(payload.uri);
+        const path = payload.path ?? (uri.scheme === "file" ? uri.fsPath : payload.uri);
+        const diagnostics = (payload.diagnostics ?? []).map((diagnostic: any) => ({
+          path,
+          line: diagnostic.range.start.line + 1,
+          column: diagnostic.range.start.character + 1,
+          endLine: diagnostic.range.end.line + 1,
+          endColumn: diagnostic.range.end.character + 1,
+          message: diagnostic.message,
+          severity: diagnostic.severity ?? 3,
+          source: diagnostic.source,
+          code: typeof diagnostic.code === "string" || typeof diagnostic.code === "number" ? String(diagnostic.code) : undefined,
+        } satisfies EditorProblem));
+        setDiagnosticsByPath((current) => {
+          const next = { ...current };
+          if (diagnostics.length) next[path] = diagnostics;
+          else delete next[path];
+          return next;
+        });
+
         const model = monaco.editor.getModel(uri);
-
-        if (!model) {
-          console.warn("LSP diagnostics: no Monaco model for", payload.uri);
-          return;
-        }
-
-        monaco.editor.setModelMarkers(
-          model,
-          "lsp",
-          (payload.diagnostics ?? []).map((diagnostic: any) => ({
-            startLineNumber: diagnostic.range.start.line + 1,
-            startColumn: diagnostic.range.start.character + 1,
-            endLineNumber: diagnostic.range.end.line + 1,
-            endColumn: diagnostic.range.end.character + 1,
+        if (model) monaco.editor.setModelMarkers(model, "lsp", diagnostics.map((diagnostic) => ({
+            startLineNumber: diagnostic.line,
+            startColumn: diagnostic.column,
+            endLineNumber: diagnostic.endLine,
+            endColumn: diagnostic.endColumn,
             message: diagnostic.message,
-            severity:
-              diagnostic.severity === 1
-                ? monaco.MarkerSeverity.Error
-                : diagnostic.severity === 2
-                  ? monaco.MarkerSeverity.Warning
-                  : monaco.MarkerSeverity.Info,
-          })),
-        );
+            severity: diagnostic.severity === 1 ? monaco.MarkerSeverity.Error : diagnostic.severity === 2 ? monaco.MarkerSeverity.Warning : monaco.MarkerSeverity.Info,
+          })));
       });
 
       return dispose;
@@ -1214,26 +1226,35 @@ export default function App() {
   // --- Create Dialog State ---
   const [createType, setCreateType] = useState<"file" | "folder" | null>(null);
   const [createPath, setCreatePath] = useState("");
+  const [createParentPath, setCreateParentPath] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
   const [renameTarget, setRenameTarget] = useState<string | null>(null);
   const [renamePath, setRenamePath] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   // --- Create Item Handler ---
   const createItem = async () => {
-    if (!workspaceDir || !createType || !createPath.trim()) return;
+    const basePath = createParentPath ?? workspaceDir;
+    const relativePath = createPath.trim();
+    if (!basePath || !createType || !relativePath) return;
 
-    const fullPath = `${workspaceDir}/${createPath}`;
+    const fullPath = `${basePath.replace(/[\\/]+$/, "")}/${relativePath}`;
+    setCreateError(null);
+    try {
+      if (await fsAPI.exists(fullPath)) {
+        setCreateError("A file or folder already exists at that path.");
+        return;
+      }
+      if (createType === "file") await fsAPI.createFile(fullPath);
+      else await fsAPI.createDir(fullPath);
 
-    if (createType === "file") {
-      await fsAPI.createFile(fullPath);
-    } else {
-      await fsAPI.createDir(fullPath);
+      setCreateType(null);
+      setCreatePath("");
+      setCreateParentPath(null);
+      await reloadWorkspace();
+    } catch (error) {
+      setCreateError(`Could not create ${createType}: ${String(error)}`);
     }
-
-    setCreateType(null);
-    setCreatePath("");
-
-    await reloadWorkspace();
   };
 
   const closeTab = (id: string) => {
@@ -1308,25 +1329,35 @@ export default function App() {
 
     await fsAPI.deletePath(target);
 
-    setTabs((prev) =>
-      prev.filter((tab) => {
-        if (!tab.path) return true;
-
-        return tab.path !== target && !tab.path.startsWith(`${target}/`);
-      }),
+    const remainingTabs = tabsRef.current.filter((tab) =>
+      !tab.path || (tab.path !== target && !tab.path.startsWith(`${target}/`)),
     );
+    setTabs(remainingTabs);
 
-    if (
-      activeTab?.path === target ||
-      activeTab?.path?.startsWith(`${target}/`)
-    ) {
-      setActiveTabId(null);
+    if (activeTab?.path === target || activeTab?.path?.startsWith(`${target}/`)) {
+      setActiveTabId(remainingTabs[remainingTabs.length - 1]?.id ?? null);
     }
 
     setDeleteTarget(null);
 
     await reloadWorkspace();
   };
+
+  const allProblems = useMemo(() => Object.values(diagnosticsByPath).flat().sort((a, b) => a.severity - b.severity || a.path.localeCompare(b.path) || a.line - b.line), [diagnosticsByPath]);
+
+  const openProblem = useCallback(async (problem: EditorProblem) => {
+    const existing = tabsRef.current.find((tab) => tab.path === problem.path);
+    if (existing) setActiveTabId(existing.id);
+    else await openFileFromExplorer(problem.path);
+    setShowWelcome(false);
+    window.setTimeout(() => {
+      const editor = editorRef.current;
+      if (!editor) return;
+      editor.revealLineInCenter(problem.line);
+      editor.setPosition({ lineNumber: problem.line, column: problem.column });
+      editor.focus();
+    }, 80);
+  }, [openFileFromExplorer]);
 
   const commands = useMemo<PaletteCommand[]>(() => [
     { id: "file.new", label: "New File", category: "File", shortcut: "⌘ N", run: newFile },
@@ -1338,6 +1369,8 @@ export default function App() {
     { id: "view.explorer", label: "Show Explorer", category: "View", run: () => { setSidebarView("files"); setSidebarVisible(true); } },
     { id: "view.search", label: "Show Search", category: "View", run: () => { setSidebarView("search"); setSidebarVisible(true); } },
     { id: "view.source-control", label: "Show Source Control", category: "View", run: () => { setSidebarView("git"); setSidebarVisible(true); } },
+    { id: "view.problems", label: "Show Problems", category: "View", shortcut: "⌘ ⇧ M", run: () => setBottomPanel("problems") },
+    { id: "view.terminal", label: "Show Terminal", category: "View", shortcut: "⌃ `", run: () => { setTerminalPanelCreated(true); setBottomPanel("terminal"); } },
     { id: "view.extensions", label: "Show Extensions", category: "View", run: () => { setSidebarView("extensions"); setSidebarVisible(true); } },
     { id: "view.settings", label: "Open Settings", category: "Preferences", shortcut: "⌘ ,", run: openSettings },
     { id: "help.about", label: "About BeagleEditor", category: "Help", run: openAbout },
@@ -1360,6 +1393,18 @@ export default function App() {
           return !visible;
         });
         setQuickOpenVisible(false);
+      }
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === "m") {
+        event.preventDefault();
+        setBottomPanel((panel) => panel === "problems" ? null : "problems");
+      }
+      if (event.ctrlKey && event.key === "`") {
+        event.preventDefault();
+        setTerminalPanelCreated(true);
+        setBottomPanel((panel) => {
+          if (panel === "terminal") return null;
+          return "terminal";
+        });
       }
     };
     window.addEventListener("keydown", handleShortcut);
@@ -1429,10 +1474,11 @@ export default function App() {
                     // Keep compatibility with Explorer prop types
                     onNewFile={(_path: string) => {}}
                     onNewFolder={(_path: string) => {}}
-                    showCreateDialog={(type) => {
-                      console.log("showCreateDialog called:", type);
+                    showCreateDialog={(type, parentPath) => {
                       setCreateType(type);
-                      setCreatePath(type === "file" ? "lib/fs.ts" : "lib");
+                      setCreateParentPath(parentPath ?? workspaceDir);
+                      setCreatePath("");
+                      setCreateError(null);
                     }}
                     onRename={(path) => {
                       const name = path.split(/[/\\]/).pop() ?? "";
@@ -1524,7 +1570,7 @@ export default function App() {
             </div>
           )}
 
-          <main className="main">
+          <main className={`main ${bottomPanel ? "has-bottom-panel" : ""}`}>
             <EditorTabs
               tabs={tabs}
               activeTabId={activeTabId}
@@ -1552,17 +1598,22 @@ export default function App() {
               <Dialog
                 title={createType === "file" ? "New File" : "New Folder"}
                 message={
-                  <input
-                    autoFocus
-                    value={createPath}
-                    onChange={(e) => setCreatePath(e.target.value)}
-                    placeholder={createType === "file" ? "lib/fs.rs" : "lib"}
-                    style={{ width: "100%" }}
-                  />
+                  <>
+                    <input
+                      autoFocus
+                      value={createPath}
+                      onChange={(e) => setCreatePath(e.target.value)}
+                      placeholder={createType === "file" ? "filename.ts" : "folder-name"}
+                      style={{ width: "100%" }}
+                    />
+                    {createError && <p role="alert" style={{ color: "var(--error, #e05252)" }}>{createError}</p>}
+                  </>
                 }
                 onCancel={() => {
                   setCreateType(null);
                   setCreatePath("");
+                  setCreateParentPath(null);
+                  setCreateError(null);
                 }}
                 onConfirm={createItem}
               />
@@ -1840,6 +1891,8 @@ export default function App() {
                 }}
               />
             )}
+            {bottomPanel === "problems" && <ProblemsPanel problems={allProblems} onSelect={(problem) => void openProblem(problem)} onClose={() => setBottomPanel(null)} />}
+            {terminalPanelCreated && <div style={{ display: bottomPanel === "terminal" ? "contents" : "none" }}><TerminalPanel cwd={workspaceDir} onClose={() => setBottomPanel(null)} /></div>}
           </main>
         </div>
 
@@ -1856,6 +1909,14 @@ export default function App() {
           insertSpaces={editorInstance
             ? (editorInstance.getModel()?.getOptions().insertSpaces ?? true)
             : true}
+          bottomPanel={bottomPanel}
+          errorCount={allProblems.filter((problem) => problem.severity === 1).length}
+          warningCount={allProblems.filter((problem) => problem.severity === 2).length}
+          onShowProblems={() => setBottomPanel((panel) => panel === "problems" ? null : "problems")}
+          onShowTerminal={() => {
+            setTerminalPanelCreated(true);
+            setBottomPanel((panel) => panel === "terminal" ? null : "terminal");
+          }}
         />
       </div>
     </div>

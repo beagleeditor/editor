@@ -1,4 +1,5 @@
 import * as monaco from "monaco-editor";
+import { AlertCircle, AlertTriangle, CircleAlert, Terminal } from "lucide-react";
 
 type Props = {
   fileName: string | null;
@@ -11,6 +12,11 @@ type Props = {
   column: number;
   tabSize: number;
   insertSpaces: boolean;
+  bottomPanel: "problems" | "terminal" | null;
+  errorCount: number;
+  warningCount: number;
+  onShowProblems: () => void;
+  onShowTerminal: () => void;
 };
 
 export default function StatusBar({
@@ -24,6 +30,11 @@ export default function StatusBar({
   column,
   tabSize,
   insertSpaces,
+  bottomPanel,
+  errorCount,
+  warningCount,
+  onShowProblems,
+  onShowTerminal,
 }: Props) {
   const displayName = fileName?.split(/[\\/]/).pop() ?? null;
   const languages = monaco.languages
@@ -34,6 +45,18 @@ export default function StatusBar({
   return (
     <footer className="status-bar" aria-label="Editor status">
       <div className="status-left">
+        <button className={`status-panel-button ${bottomPanel === "problems" ? "active" : ""}`} onClick={onShowProblems} title="Toggle Problems" aria-label="Toggle Problems">
+          <CircleAlert size={14} />
+          <span>Problems</span>
+          <span className="status-problem-counts" aria-label={`${errorCount} errors, ${warningCount} warnings`}>
+            <span className="status-error-count"><AlertCircle size={12} />{errorCount}</span>
+            <span className="status-warning-count"><AlertTriangle size={12} />{warningCount}</span>
+          </span>
+        </button>
+        <button className={`status-panel-button ${bottomPanel === "terminal" ? "active" : ""}`} onClick={onShowTerminal} title="Toggle Terminal" aria-label="Toggle Terminal">
+          <Terminal size={14} />
+          <span>Terminal</span>
+        </button>
         <span className="status-file" title={fileName ?? "No file open"}>
           {displayName ?? "No file open"}{dirty ? " ●" : ""}
         </span>

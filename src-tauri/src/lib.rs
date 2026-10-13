@@ -2,6 +2,7 @@ pub mod fs;
 pub mod git;
 pub mod lsp;
 pub mod search;
+pub mod terminal;
 
 use tauri::{
     menu::{Menu, MenuItem, Submenu},
@@ -101,6 +102,9 @@ pub fn run() {
             git::git_commit,
             git::git_push,
             git::git_pull,
+            terminal::terminal_start,
+            terminal::terminal_write,
+            terminal::terminal_stop,
             read_dir,
             fs::list_extensions,
             fs::extensions_directory,

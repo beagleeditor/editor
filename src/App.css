@@ -534,6 +534,27 @@ body {
   gap: 14px;
 }
 
+.status-panel-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 5px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.status-panel-button:hover,
+.status-panel-button.active { color: var(--text); background: var(--surface-hover); }
+.status-problem-counts { display: inline-flex; align-items: center; gap: 6px; margin-left: 2px; }
+.status-error-count,
+.status-warning-count { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-variant-numeric: tabular-nums; }
+.status-error-count { color: var(--error, #e05252); }
+.status-warning-count { color: var(--warning, #d99a28); }
+
 .language-select {
   background: transparent;
   border: none;
@@ -1597,6 +1618,8 @@ button:focus-visible,
   border-color: var(--border);
   background: var(--surface);
 }
+
+.status-panel-button { border-radius: 0 !important; }
 .dialog-actions button { border-radius: 7px; }
 .quickopen, .quickopen-input, .quickopen-results { background: var(--surface); }
 .quickopen { border-color: var(--border); }
@@ -2102,6 +2125,55 @@ button:focus-visible,
 .extension-remove-button { flex: 0 0 auto; padding: 6px !important; color: var(--muted); }
 .extension-remove-button:hover:not(:disabled) { color: #ef4444; }
 .extensions-footer { margin-top: auto; padding: 14px 16px; border-top: 1px solid var(--border); color: var(--muted); font-size: 10px; line-height: 1.5; }
+
+/* Shared bottom dock: diagnostics and shell output stay inside the editor grid. */
+.main.has-bottom-panel { grid-template-rows: 48px minmax(0, 1fr) 250px; }
+.bottom-panel-header {
+  display: flex;
+  flex: 0 0 36px;
+  min-width: 0;
+  height: 36px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+.bottom-panel-tabs, .problems-summary, .terminal-actions { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.bottom-panel-tabs > strong { font-size: 12px; font-weight: 600; }
+.panel-count { min-width: 18px; padding: 2px 5px; border-radius: 4px; background: var(--surface-hover); color: var(--muted); font-size: 10px; text-align: center; }
+.panel-icon-button { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border: 0; border-radius: 4px; background: transparent; color: var(--muted); cursor: pointer; }
+.panel-icon-button:hover:not(:disabled) { background: var(--surface-hover); color: var(--text); }
+.panel-icon-button:disabled { opacity: .35; cursor: default; }
+.problems-panel, .terminal-panel { grid-column: 1; grid-row: 3; display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; border-top: 1px solid var(--border); background: var(--bg); color: var(--text); }
+.problems-summary { color: var(--muted); font-size: 11px; }
+.problems-summary > span { display: inline-flex; align-items: center; gap: 4px; }
+.problems-list { min-height: 0; flex: 1; overflow: auto; padding: 4px 0; }
+.problem-row { display: flex; width: 100%; min-height: 34px; align-items: center; gap: 9px; padding: 5px 12px; border: 0; border-left: 2px solid transparent; background: transparent; color: var(--text); text-align: left; cursor: pointer; }
+.problem-row:hover { background: var(--surface-hover); border-left-color: var(--accent); }
+.problem-error { flex: 0 0 auto; color: #f87171; }
+.problem-warning { flex: 0 0 auto; color: #fbbf24; }
+.problem-info { flex: 0 0 auto; color: #60a5fa; }
+.problem-message { flex: 1; min-width: 0; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.problem-message small { display: inline; margin-left: 8px; color: var(--muted); font-size: 10px; }
+.problem-location { flex: 0 0 auto; max-width: 36%; overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.panel-empty { display: flex; height: 100%; align-items: center; justify-content: center; gap: 8px; color: var(--muted); font-size: 12px; }
+.terminal-tab { display: inline-flex; align-items: center; gap: 7px; padding: 6px 8px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font-size: 11px; cursor: pointer; }
+.terminal-tab.selected { border-bottom-color: var(--accent); color: var(--text); }
+.terminal-dot { display: inline-block; width: 6px; height: 6px; flex: 0 0 6px; border-radius: 50%; background: var(--muted); }
+.terminal-dot.running { background: #4ade80; }
+.terminal-session-info { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 10px; }
+.terminal-output { flex: 1; min-height: 0; margin: 0; padding: 10px 13px; overflow: auto; color: var(--text); background: var(--bg); font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.terminal-input-row { display: flex; flex: 0 0 38px; align-items: center; gap: 9px; padding: 0 12px; border-top: 1px solid var(--border); }
+.terminal-prompt { color: var(--accent); font-size: 18px; }
+.terminal-input-row input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.terminal-input-row input::placeholder { color: var(--muted); }
+.terminal-input-row > button { padding: 5px 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); color: var(--text); font-size: 11px; cursor: pointer; }
+.terminal-input-row > button:disabled { opacity: .4; cursor: default; }
+.terminal-error { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 5px 12px; color: #f87171; font-size: 11px; }
+.terminal-error button { display: flex; border: 0; background: transparent; color: inherit; cursor: pointer; }
 
 /* Blue accent only: intentionally leave every existing background token unchanged. */
 .app.theme-dark,
