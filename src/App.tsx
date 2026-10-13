@@ -1287,6 +1287,12 @@ export default function App() {
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() === "b") {
+        event.preventDefault();
+        setSidebarVisible((visible) => !visible);
+        return;
+      }
+
       if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === "p") {
         event.preventDefault();
         setCommandPaletteVisible((visible) => {
@@ -1338,7 +1344,17 @@ export default function App() {
       />
       <div className={`app theme-${theme}`}>
         <div className="workspace">
-          <ActivityBar active={sidebarView} onSelect={setSidebarView} />
+          <ActivityBar
+            active={sidebarView}
+            onSelect={(view) => {
+              if (sidebarView === view && sidebarVisible) {
+                setSidebarVisible(false);
+              } else {
+                setSidebarView(view);
+                setSidebarVisible(true);
+              }
+            }}
+          />
 
           {sidebarVisible && (
             <div className="sidebar-container">
