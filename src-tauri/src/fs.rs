@@ -245,6 +245,38 @@ pub fn install_extension(app: tauri::AppHandle, source: String) -> Result<String
 }
 
 #[tauri::command]
+pub fn install_extension_from_git(app: tauri::AppHandle, url: String) -> Result<String, String> {
+    let url = url.trim();
+    if !(url.starts_with("https://")
+        || url.starts_with("http://")
+        || url.starts_with("ssh://")
+        || (url.starts_with("git@") && url.contains(':')))
+    {
+        return Err("Enter a Git repository URL (HTTPS, SSH, or git@host:path).".into());
+    }
+
+    let temporary = tempfile::tempdir()
+        .map_err(|e| format!("Could not create a temporary directory: {e}"))?;
+    let checkout = temporary.path().join("repository");
+    let output = std::process::Command::new("git")
+        .args(["clone", "--depth", "1", "--", url])
+        .arg(&checkout)
+        .output()
+        .map_err(|e| format!("Could not run Git. Make sure Git is installed: {e}"))?;
+    if !output.status.success() {
+        let detail = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(if detail.is_empty() {
+            "Git could not clone that repository.".into()
+        } else {
+            format!("Git clone failed: {detail}")
+        });
+    }
+
+    // Reuse the same manifest validation and safe-copy path as folder installs.
+    install_extension(app, checkout.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
 pub fn remove_extension(app: tauri::AppHandle, id: String) -> Result<String, String> {
     if !valid_extension_id(&id) {
         return Err("Invalid extension id.".into());

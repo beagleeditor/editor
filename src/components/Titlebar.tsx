@@ -6,17 +6,19 @@ type Props = {
   query: string;
   onQueryChange: (value: string) => void;
   onOpenQuickOpen: () => void;
+  quickOpenOpen: boolean;
+  quickOpenMode: "files" | "themes";
   commandPaletteOpen: boolean;
   commandQuery: string;
   onCommandQueryChange: (value: string) => void;
 };
 
-export default function TitleBar({ theme, query, onQueryChange, onOpenQuickOpen, commandPaletteOpen, commandQuery, onCommandQueryChange }: Props) {
+export default function TitleBar({ theme, query, onQueryChange, onOpenQuickOpen, quickOpenOpen, quickOpenMode, commandPaletteOpen, commandQuery, onCommandQueryChange }: Props) {
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (commandPaletteOpen) searchRef.current?.focus();
-  }, [commandPaletteOpen]);
+    if (commandPaletteOpen || quickOpenOpen) searchRef.current?.focus();
+  }, [commandPaletteOpen, quickOpenOpen, quickOpenMode]);
 
   return (
     <div className={`titlebar theme-${theme}`} data-tauri-drag-region>
@@ -24,7 +26,7 @@ export default function TitleBar({ theme, query, onQueryChange, onOpenQuickOpen,
         ref={searchRef}
         data-tauri-drag-region={false}
         className="titlebar-search"
-        placeholder={commandPaletteOpen ? "Type a command…" : "Quick Open..."}
+        placeholder={commandPaletteOpen ? "Type a command…" : quickOpenOpen && quickOpenMode === "themes" ? "Search color themes..." : "Quick Open..."}
         value={commandPaletteOpen ? commandQuery : query}
         onChange={(e) => {
           if (commandPaletteOpen) {

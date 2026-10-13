@@ -1,0 +1,8 @@
+{
+  "id": "yaldas-night",
+  "name": "Yalda's Night",
+  "version": "1.0.0",
+  "description": "A deep winter-night theme with pomegranate, watermelon, and warm gold accents.",
+  "type": "theme",
+  "theme": "theme.json"
+}

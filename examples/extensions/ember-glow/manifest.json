@@ -1,0 +1,8 @@
+{
+  "id": "ember-glow",
+  "name": "Ember Glow",
+  "version": "1.0.0",
+  "description": "A warm charcoal theme with copper and amber highlights.",
+  "type": "theme",
+  "theme": "theme.json"
+}

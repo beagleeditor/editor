@@ -3,26 +3,29 @@ import { Icon } from "@iconify/react";
 
 type Props = {
   theme: "dark" | "light";
+  mode?: "files" | "themes";
   files: { path: string; name: string }[];
+  themes?: { id: string; name: string; base: string; colors: Record<string, string> }[];
+  activeThemeId?: string;
+  onSelectTheme?: (id: string) => void;
   query?: string;
-  onQueryChange?: (value: string) => void;
   onOpen: (path: string) => void;
   onClose: () => void;
 };
 
 export default function QuickOpen({
   theme,
+  mode = "files",
   files,
+  themes = [],
+  activeThemeId = "auto",
+  onSelectTheme,
   query: externalQuery,
-  onQueryChange,
   onOpen,
   onClose,
 }: Props) {
-  const [internalQuery, setInternalQuery] = useState("");
-  const query = externalQuery ?? internalQuery;
+  const query = externalQuery ?? "";
   const [selected, setSelected] = useState(0);
-
-  const inputRef = useRef<HTMLInputElement>(null);
 
   // 🔍 filter files (live search)
   const results = useMemo(() => {
@@ -32,11 +35,11 @@ export default function QuickOpen({
 
     return files.filter((f) => f.name.toLowerCase().includes(q));
   }, [query, files]);
-
-  // 🎯 focus input when opened
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+  const themeResults = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return themes.filter((item) => !q || item.name.toLowerCase().includes(q));
+  }, [query, themes]);
+  const itemCount = mode === "themes" ? themeResults.length : results.length;
 
   // 🔄 reset selection when results change
   useEffect(() => {
@@ -51,11 +54,11 @@ export default function QuickOpen({
         return;
       }
 
-      if (results.length === 0) return;
+      if (itemCount === 0) return;
 
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        setSelected((prev) => Math.min(prev + 1, results.length - 1));
+        setSelected((prev) => Math.min(prev + 1, itemCount - 1));
       }
 
       if (e.key === "ArrowUp") {
@@ -64,41 +67,43 @@ export default function QuickOpen({
       }
 
       if (e.key === "Enter") {
-        const file = results[selected];
-        if (!file) return;
-
-        onOpen(file.path);
-        onClose();
+        if (mode === "themes") {
+          const selectedTheme = themeResults[selected];
+          if (!selectedTheme) return;
+          onSelectTheme?.(selectedTheme.id);
+          onClose();
+        } else {
+          const file = results[selected];
+          if (!file) return;
+          onOpen(file.path);
+          onClose();
+        }
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [results, selected, onOpen, onClose]);
-
-  console.log("QuickOpen results:", results.length);
+  }, [itemCount, mode, results, themeResults, selected, onOpen, onSelectTheme, onClose]);
 
   return (
     <div className={`quickopen-backdrop theme-${theme}`} onClick={onClose}>
       <div className="quickopen" onClick={(e) => e.stopPropagation()}>
-        {/* INPUT */}
-        <input
-          ref={inputRef}
-          className="quickopen-input"
-          placeholder="Search files..."
-          value={query}
-          onChange={(e) => {
-            if (onQueryChange) {
-              onQueryChange(e.target.value);
-            } else {
-              setInternalQuery(e.target.value);
-            }
-          }}
-        />
-
         {/* RESULTS */}
-        <div className="quickopen-results">
-          {results.length === 0 ? (
+        <div className={`quickopen-results ${mode === "themes" ? "quickopen-theme-results" : ""}`}>
+          {mode === "themes" ? (themeResults.length === 0 ? (
+            <div className="quickopen-empty">No themes found. Install a theme extension to add more.</div>
+          ) : themeResults.map((item, index) => (
+            <button type="button" key={item.id} className={`quickopen-item quickopen-theme-item ${index === selected ? "selected" : ""} ${activeThemeId === item.id ? "active-theme" : ""}`} aria-pressed={activeThemeId === item.id} onMouseEnter={() => setSelected(index)} onClick={() => { onSelectTheme?.(item.id); onClose(); }}>
+              <span className={`theme-preview theme-preview-${item.base === "vs" ? "light" : "dark"}`} style={{ background: item.colors["editor.background"] ?? (item.base === "vs" ? "#fff" : "#171717"), color: item.colors["editor.foreground"] ?? (item.base === "vs" ? "#222" : "#eee"), borderColor: item.colors["sideBar.border"] ?? item.colors["panel.border"] ?? "transparent" }}>
+                <span style={{ background: item.colors["sideBar.background"] ?? "#777" }} />
+                <span style={{ background: item.colors["editor.selectionBackground"] ?? item.colors["focusBorder"] ?? "#888" }} />
+                <span style={{ background: item.colors["button.background"] ?? item.colors["editorCursor.foreground"] ?? "#aaa" }} />
+                <i style={{ background: item.colors["editor.foreground"] ?? "currentColor" }} />
+              </span>
+              <span className="quickopen-theme-copy"><span className="quickopen-label">{item.name}</span><small>{item.id === "auto" ? "Follow interface appearance" : item.base === "vs" ? "Light theme extension" : "Dark theme extension"}</small></span>
+              {activeThemeId === item.id && <span className="quickopen-theme-check">✓</span>}
+            </button>
+          ))) : results.length === 0 ? (
             <div className="quickopen-empty">No files found</div>
           ) : (
             results.map((file, index) => (

@@ -1,4 +1,5 @@
-import { Check, ExternalLink, FolderPlus, Puzzle, RefreshCw, Trash2 } from "lucide-react";
+import { Check, ExternalLink, FolderPlus, GitBranch, Puzzle, RefreshCw, Trash2 } from "lucide-react";
+import { useState } from "react";
 
 type Extension = {
   manifest: { id: string; name: string; version: string; description?: string; type?: string };
@@ -13,12 +14,14 @@ type Props = {
   onToggle: (id: string, enabled: boolean) => void;
   onReload: () => void;
   onInstall: () => void;
+  onInstallFromGit: (url: string) => void;
   onRemove: (id: string, name: string) => void;
   installing: boolean;
   onOpenDirectory: () => void;
 };
 
-export default function ExtensionsView({ extensions, status, directory, enabled, onToggle, onReload, onInstall, onRemove, installing, onOpenDirectory }: Props) {
+export default function ExtensionsView({ extensions, status, directory, enabled, onToggle, onReload, onInstall, onInstallFromGit, onRemove, installing, onOpenDirectory }: Props) {
+  const [gitUrl, setGitUrl] = useState("");
   return (
     <section className="extensions-view">
       <header className="extensions-header">
@@ -33,6 +36,14 @@ export default function ExtensionsView({ extensions, status, directory, enabled,
       </div>
       <div className="extensions-status">{status}</div>
       <button className="extensions-install-button" onClick={onInstall} disabled={installing}><FolderPlus size={15} /> {installing ? "Installing…" : "Install from Folder"}</button>
+      <form className="extensions-git-form" onSubmit={(event) => { event.preventDefault(); if (!gitUrl.trim() || installing) return; onInstallFromGit(gitUrl.trim()); }}>
+        <label htmlFor="extension-git-url">Install from Git</label>
+        <div className="extensions-git-row">
+          <input id="extension-git-url" type="text" value={gitUrl} onChange={(event) => setGitUrl(event.target.value)} placeholder="https://github.com/user/extension.git" disabled={installing} />
+          <button type="submit" disabled={installing || !gitUrl.trim()} title="Clone and install extension"><GitBranch size={15} /> {installing ? "Installing…" : "Add"}</button>
+        </div>
+        <small>Repository root must contain a valid manifest.json. Git must be installed.</small>
+      </form>
       {extensions.length === 0 ? (
         <div className="extensions-empty">
           <Puzzle size={27} strokeWidth={1.5} />

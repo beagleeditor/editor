@@ -1,0 +1,8 @@
+{
+  "id": "rose-pine",
+  "name": "Ros\u00e9 Pine",
+  "version": "1.0.0",
+  "description": "A muted plum theme with rose and pine accents.",
+  "type": "theme",
+  "theme": "theme.json"
+}

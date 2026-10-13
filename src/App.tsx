@@ -628,6 +628,7 @@ export default function App() {
   }, [settings.sidebarWidth]);
 
   const [quickOpenVisible, setQuickOpenVisible] = useState(false);
+  const [quickOpenMode, setQuickOpenMode] = useState<"files" | "themes">("files");
   const [commandPaletteVisible, setCommandPaletteVisible] = useState(false);
   const [commandPaletteQuery, setCommandPaletteQuery] = useState("");
   const [quickOpenQuery, setQuickOpenQuery] = useState("");
@@ -1474,6 +1475,7 @@ export default function App() {
     { id: "view.terminal", label: "Show Terminal", category: "View", shortcut: "⌃ `", run: () => { setTerminalPanelCreated(true); setBottomPanel("terminal"); } },
     { id: "view.extensions", label: "Show Extensions", category: "View", run: () => { setSidebarView("extensions"); setSidebarVisible(true); } },
     { id: "view.settings", label: "Open Settings", category: "Preferences", shortcut: "⌘ ,", run: openSettings },
+    { id: "preferences.color-themes", label: "Color Themes", category: "Preferences", run: () => { setQuickOpenMode("themes"); setQuickOpenQuery(""); setQuickOpenVisible(true); setCommandPaletteVisible(false); } },
     { id: "help.about", label: "About BeagleEditor", category: "Help", run: openAbout },
     { id: "view.toggle-sidebar", label: "Toggle Sidebar", category: "View", run: () => setSidebarVisible((visible) => !visible) },
     ...extensionCommands,
@@ -1526,13 +1528,32 @@ export default function App() {
       {quickOpenVisible && (
         <QuickOpen
           theme={theme}
+          mode={quickOpenMode}
           files={flattenTree(fileTree)}
+          themes={[
+            {
+              id: "auto",
+              name: "Match Interface Appearance",
+              base: theme === "light" ? "vs" : "vs-dark",
+              colors: theme === "light"
+                ? { "editor.background": "#FFFFFF", "editor.foreground": "#222222", "sideBar.background": "#F4F4F4", "sideBar.border": "#D6D6D6", "editor.selectionBackground": "#C9D8F5", "button.background": "#3B82F6" }
+                : { "editor.background": "#171717", "editor.foreground": "#EEEEEE", "sideBar.background": "#202020", "sideBar.border": "#383838", "editor.selectionBackground": "#344B70", "button.background": "#3B82F6" },
+            },
+            ...availableColorThemes.map((extension) => ({
+              id: extension.manifest.id,
+              name: extension.manifest.name,
+              base: extension.themeData?.base ?? "vs-dark",
+              colors: extension.themeData?.colors ?? {},
+            })),
+          ]}
+          activeThemeId={settings.colorTheme}
+          onSelectTheme={(id) => update("colorTheme", id)}
           query={quickOpenQuery}
-          onQueryChange={setQuickOpenQuery}
           onOpen={openFileFromExplorer}
           onClose={() => {
             setQuickOpenVisible(false);
             setQuickOpenQuery("");
+            setQuickOpenMode("files");
           }}
         />
       )}
@@ -1541,7 +1562,10 @@ export default function App() {
         theme={theme}
         query={quickOpenQuery}
         onQueryChange={setQuickOpenQuery}
+        quickOpenOpen={quickOpenVisible}
+        quickOpenMode={quickOpenMode}
         onOpenQuickOpen={() => {
+          setQuickOpenMode("files");
           setQuickOpenVisible(true);
         }}
         commandPaletteOpen={commandPaletteVisible}
@@ -1629,6 +1653,20 @@ export default function App() {
                       }).catch((error) => setExtensionStatus(`Removal failed: ${String(error)}`));
                     }}
                     installing={installingExtension}
+                    onInstallFromGit={async (url) => {
+                      if (installingExtension) return;
+                      setInstallingExtension(true);
+                      setExtensionStatus("Cloning Git repository…");
+                      try {
+                        const message = await invoke<string>("install_extension_from_git", { url });
+                        await reloadExtensions();
+                        setExtensionStatus(message);
+                      } catch (error) {
+                        setExtensionStatus(`Git installation failed: ${String(error)}`);
+                      } finally {
+                        setInstallingExtension(false);
+                      }
+                    }}
                     onInstall={async () => {
                       if (installingExtension) return;
                       setInstallingExtension(true);

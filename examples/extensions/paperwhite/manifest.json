@@ -1,0 +1,8 @@
+{
+  "id": "paperwhite",
+  "name": "Paperwhite",
+  "version": "1.0.0",
+  "description": "A soft light theme with ink text and indigo accents.",
+  "type": "theme",
+  "theme": "theme.json"
+}

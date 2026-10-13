@@ -1,0 +1,8 @@
+{
+  "id": "nord-frost",
+  "name": "Nord Frost",
+  "version": "1.0.0",
+  "description": "A cool blue-gray theme inspired by arctic nights.",
+  "type": "theme",
+  "theme": "theme.json"
+}

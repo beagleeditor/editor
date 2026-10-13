@@ -99,6 +99,21 @@ Install the folder from the **Extensions** view, enable it, then open **Settings
 
 See [`examples/extensions/midnight-teal`](../examples/extensions/midnight-teal) for a complete working theme extension.
 
+### Example themes (not built in)
+
+The repository includes several independent theme-extension folders under [`examples/extensions`](../examples/extensions). They are examples you can install; they are **not bundled as built-in themes**. Install each theme separately from the Extensions view using **Install from Folder**, selecting the theme's folder, then enable it and choose it in **Settings → Editor color theme**.
+
+| Theme | Style | Folder |
+| --- | --- | --- |
+| Midnight Teal | Deep blue-green surfaces and teal accents | [`midnight-teal`](../examples/extensions/midnight-teal) |
+| Nord Frost | Cool blue-gray surfaces | [`nord-frost`](../examples/extensions/nord-frost) |
+| Rosé Pine | Muted plum, rose, and pine tones | [`rose-pine`](../examples/extensions/rose-pine) |
+| Ember Glow | Warm charcoal, copper, and amber | [`ember-glow`](../examples/extensions/ember-glow) |
+| Paperwhite | Soft light surfaces with indigo accents | [`paperwhite`](../examples/extensions/paperwhite) |
+| Yalda's Night | Winter-night plum with pomegranate, watermelon, and gold accents | [`yaldas-night`](../examples/extensions/yaldas-night) |
+
+These examples define both Monaco editor colors and workbench colors such as `sideBar.background`, `panel.background`, `titleBar.activeBackground`, and `statusBar.background`. If a theme only defines `editor.*` keys, its editor changes but the rest of the interface uses fallback colors.
+
 ## 5. Your first JavaScript extension
 
 Put this in `main.js`:

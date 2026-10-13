@@ -108,6 +108,7 @@ pub fn run() {
             fs::list_extensions,
             fs::extensions_directory,
             fs::install_extension,
+            fs::install_extension_from_git,
             fs::remove_extension,
             read_file,
             write_file,
