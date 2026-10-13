@@ -1,0 +1,7 @@
+{
+  "id": "word-counter",
+  "name": "Word Counter",
+  "version": "1.0.0",
+  "description": "Counts words in the active document.",
+  "main": "main.js"
+}
