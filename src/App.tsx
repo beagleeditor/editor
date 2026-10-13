@@ -31,6 +31,7 @@ import About from "./components/About";
 import Dialog from "./components/Dialog";
 import QuickOpen from "./components/QuickOpen";
 import CommandPalette, { type PaletteCommand } from "./components/CommandPalette";
+import ExtensionsView from "./components/ExtensionsView";
 
 import {
   attachModelSync,
@@ -41,8 +42,16 @@ import {
 
 /* ---------------- TYPES ---------------- */
 
-type SidebarView = "files" | "search" | "git" | "settings";
+type SidebarView = "files" | "search" | "git" | "extensions" | "settings";
 export type Theme = "dark" | "light" | "system";
+
+type InstalledExtension = {
+  manifest: { id: string; name: string; version: string; description?: string; main?: string };
+  entry: string;
+  path: string;
+};
+
+type ExtensionCommand = PaletteCommand & { extensionId: string };
 
 loader.config({ monaco });
 
@@ -432,6 +441,87 @@ export default function App() {
   };
 
   const [showAbout, setShowAbout] = useState(false);
+  const [extensions, setExtensions] = useState<InstalledExtension[]>([]);
+  const [extensionCommands, setExtensionCommands] = useState<ExtensionCommand[]>([]);
+  const [extensionStatus, setExtensionStatus] = useState("Loading extensions…");
+  const [extensionsDirectory, setExtensionsDirectory] = useState("");
+  const [enabledExtensions, setEnabledExtensions] = useState<Record<string, boolean>>(() => {
+    try { return JSON.parse(localStorage.getItem("beagle-enabled-extensions") ?? "{}"); }
+    catch { return {}; }
+  });
+  const extensionDisposers = useRef<Map<string, () => void>>(new Map());
+
+  const reloadExtensions = useCallback(async () => {
+    try {
+      const [installed, directory] = await Promise.all([
+        invoke<InstalledExtension[]>("list_extensions"),
+        invoke<string>("extensions_directory"),
+      ]);
+      setExtensions(installed);
+      setExtensionsDirectory(directory);
+      setExtensionStatus(installed.length ? `${installed.length} extension${installed.length === 1 ? "" : "s"} found` : "No extensions installed yet");
+    } catch (error) {
+      setExtensionStatus(`Could not load extensions: ${String(error)}`);
+    }
+  }, []);
+
+  useEffect(() => { void reloadExtensions(); }, [reloadExtensions]);
+
+  useEffect(() => {
+    localStorage.setItem("beagle-enabled-extensions", JSON.stringify(enabledExtensions));
+  }, [enabledExtensions]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const disposers = new Map<string, () => void>();
+    const commands: ExtensionCommand[] = [];
+
+    const activate = async () => {
+      for (const extension of extensions) {
+        const id = extension.manifest.id;
+        if (enabledExtensions[id] === false) continue;
+        try {
+          const moduleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(extension.entry)}`;
+          const module = await import(/* @vite-ignore */ moduleUrl) as { activate?: (api: any) => unknown | Promise<unknown> };
+          if (cancelled) break;
+          const registered = new Map<string, ExtensionCommand>();
+          const result = await module.activate?.({
+            extension: extension.manifest,
+            registerCommand: (command: { id: string; title: string; run: () => void | Promise<void> }) => {
+              if (!command?.id || !command.title || typeof command.run !== "function") return () => {};
+              const fullId = `${id}.${command.id}`;
+              const item: ExtensionCommand = { id: fullId, label: command.title, category: extension.manifest.name, extensionId: id, run: command.run };
+              registered.set(fullId, item);
+              commands.push(item);
+              setExtensionCommands([...commands]);
+              return () => registered.delete(fullId);
+            },
+            showMessage: (message: string) => window.alert(`[${extension.manifest.name}] ${String(message)}`),
+            getActiveDocument: () => {
+              const tab = activeTabRef.current;
+              return tab ? { name: tab.name, path: tab.path, language: tab.language, content: tab.content, dirty: tab.dirty } : null;
+            },
+          });
+          disposers.set(id, () => {
+            if (typeof result === "function") (result as () => void)();
+            else if (result && typeof (result as { dispose?: unknown }).dispose === "function") (result as { dispose: () => void }).dispose();
+          });
+        } catch (error) {
+          console.error(`Extension ${id} failed to activate:`, error);
+          setExtensionStatus(`${extension.manifest.name} failed to activate; see console`);
+        }
+      }
+      if (!cancelled) setExtensionCommands([...commands]);
+    };
+    setExtensionCommands([]);
+    void activate();
+    return () => {
+      cancelled = true;
+      for (const dispose of disposers.values()) {
+        try { dispose(); } catch (error) { console.error("Extension cleanup failed:", error); }
+      }
+    };
+  }, [extensions, enabledExtensions]);
 
   const [tabToClose, setTabToClose] = useState<Tab | null>(null);
 
@@ -1155,10 +1245,12 @@ export default function App() {
     { id: "view.explorer", label: "Show Explorer", category: "View", run: () => { setSidebarView("files"); setSidebarVisible(true); } },
     { id: "view.search", label: "Show Search", category: "View", run: () => { setSidebarView("search"); setSidebarVisible(true); } },
     { id: "view.source-control", label: "Show Source Control", category: "View", run: () => { setSidebarView("git"); setSidebarVisible(true); } },
+    { id: "view.extensions", label: "Show Extensions", category: "View", run: () => { setSidebarView("extensions"); setSidebarVisible(true); } },
     { id: "view.settings", label: "Open Settings", category: "Preferences", shortcut: "⌘ ,", run: openSettings },
     { id: "help.about", label: "About BeagleEditor", category: "Help", run: openAbout },
     { id: "view.toggle-sidebar", label: "Toggle Sidebar", category: "View", run: () => setSidebarVisible((visible) => !visible) },
-  ], [newFile, openFile, openFolder, saveFile, formatActiveDocument, openSettings, openAbout]);
+    ...extensionCommands,
+  ], [newFile, openFile, openFolder, saveFile, formatActiveDocument, openSettings, openAbout, extensionCommands]);
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
@@ -1257,6 +1349,18 @@ export default function App() {
                 )}
 
                 {sidebarView === "git" && <SourceControl></SourceControl>}
+
+                {sidebarView === "extensions" && (
+                  <ExtensionsView
+                    extensions={extensions}
+                    status={extensionStatus}
+                    directory={extensionsDirectory}
+                    enabled={enabledExtensions}
+                    onToggle={(id, enabled) => setEnabledExtensions((current) => ({ ...current, [id]: enabled }))}
+                    onReload={() => void reloadExtensions()}
+                    onOpenDirectory={() => void invoke("reveal_in_finder", { path: extensionsDirectory }).catch((error) => setExtensionStatus(`Could not open extension folder: ${String(error)}`))}
+                  />
+                )}
 
                 {sidebarView === "settings" && (
                   <SettingsPage settings={settings} update={update} />

@@ -84,6 +84,8 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .invoke_handler(tauri::generate_handler![
             read_dir,
+            fs::list_extensions,
+            fs::extensions_directory,
             read_file,
             write_file,
             read_workspace,

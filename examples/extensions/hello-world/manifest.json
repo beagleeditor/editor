@@ -1,0 +1,7 @@
+{
+  "id": "hello-world",
+  "name": "Hello World",
+  "version": "1.0.0",
+  "description": "A tiny example extension that adds a command to the command palette.",
+  "main": "main.js"
+}

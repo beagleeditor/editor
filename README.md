@@ -72,3 +72,23 @@ BeagleEditor uses language servers installed on your system for completion, navi
 | Swift | `sourcekit-lsp` |
 | HTML, CSS, JSON | `vscode-*-language-server --stdio` |
 | YAML | `yaml-language-server --stdio` |
+
+## Extensions
+
+BeagleEditor supports local JavaScript extensions. Open the **Extensions** view from the activity bar to find your extension directory, reload installed extensions, and enable or disable them. Each extension lives in its own folder and contains a `manifest.json` plus a JavaScript entry point (default: `main.js`).
+
+Example `manifest.json`:
+
+```json
+{
+  "id": "hello-world",
+  "name": "Hello World",
+  "version": "1.0.0",
+  "description": "An example extension",
+  "main": "main.js"
+}
+```
+
+An entry point exports `activate(api)`. The initial API supports `api.registerCommand({ id, title, run })`, `api.showMessage(message)`, and `api.getActiveDocument()` (returns the active document's name, path, language, content, and dirty state, or `null`). Registered commands appear in the command palette (`Cmd/Ctrl+Shift+P`). Return a cleanup function from `activate` to release resources when the extension is disabled or reloaded.
+
+See [`examples/extensions/hello-world`](examples/extensions/hello-world) for a working starter. Extensions execute JavaScript inside the editor and are **not sandboxed**; only install code you trust.

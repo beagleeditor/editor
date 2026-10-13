@@ -4,7 +4,56 @@ use std::path::{Path, PathBuf};
 
 use notify::{Watcher, RecursiveMode, recommended_watcher};
 use std::sync::mpsc::channel;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
+use serde::Deserialize;
+
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ExtensionManifest {
+    pub id: String,
+    pub name: String,
+    pub version: String,
+    pub description: Option<String>,
+    pub main: Option<String>,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct InstalledExtension {
+    pub manifest: ExtensionManifest,
+    pub entry: String,
+    pub path: String,
+}
+
+#[tauri::command]
+pub fn list_extensions(app: tauri::AppHandle) -> Result<Vec<InstalledExtension>, String> {
+    let base = app.path().app_config_dir().map_err(|e| e.to_string())?.join("extensions");
+    fs::create_dir_all(&base).map_err(|e| e.to_string())?;
+    let mut extensions = Vec::new();
+
+    for item in fs::read_dir(&base).map_err(|e| e.to_string())?.flatten() {
+        if !item.file_type().map(|t| t.is_dir()).unwrap_or(false) { continue; }
+        let manifest_path = item.path().join("manifest.json");
+        let manifest_text = match fs::read_to_string(&manifest_path) { Ok(text) => text, Err(_) => continue };
+        let manifest: ExtensionManifest = match serde_json::from_str(&manifest_text) { Ok(value) => value, Err(_) => continue };
+        if manifest.id.trim().is_empty() || manifest.name.trim().is_empty() || manifest.version.trim().is_empty() { continue; }
+        let entry_name = manifest.main.as_deref().unwrap_or("main.js");
+        let entry_path = item.path().join(entry_name);
+        // Keep the entry point inside the extension directory.
+        if entry_path.parent() != Some(item.path().as_path()) { continue; }
+        let entry = match fs::read_to_string(&entry_path) { Ok(source) => source, Err(_) => continue };
+        extensions.push(InstalledExtension { manifest, entry, path: item.path().to_string_lossy().into_owned() });
+    }
+    extensions.sort_by(|a, b| a.manifest.name.to_lowercase().cmp(&b.manifest.name.to_lowercase()));
+    Ok(extensions)
+}
+
+#[tauri::command]
+pub fn extensions_directory(app: tauri::AppHandle) -> Result<String, String> {
+    let path = app.path().app_config_dir().map_err(|e| e.to_string())?.join("extensions");
+    fs::create_dir_all(&path).map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().into_owned())
+}
 
 /// -----------------------------------------------------
 /// FILE NODE (shared with frontend)
