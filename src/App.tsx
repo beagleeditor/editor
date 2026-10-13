@@ -20,8 +20,8 @@ import WelcomeScreen from "./components/WelcomeScreen";
 import SearchView from "./components/SearchView";
 import SettingsPage from "./components/Settings";
 import TitleBar from "./components/Titlebar";
-
 import { searchAPI } from "./lib/search";
+
 
 import "./App.css";
 import { useSettings } from "./lib/useSettings";
@@ -35,6 +35,7 @@ import ExtensionsView from "./components/ExtensionsView";
 import ProblemsPanel, { type EditorProblem } from "./components/ProblemsPanel";
 import TerminalPanel from "./components/TerminalPanel";
 import { editorOptions } from "./lib/settings";
+import { useExtensionRuntime } from "./lib/useExtensionRuntime";
 
 import {
   attachModelSync,
@@ -499,11 +500,16 @@ export default function App() {
   const [extensionStatus, setExtensionStatus] = useState("Loading extensions…");
   const [extensionsDirectory, setExtensionsDirectory] = useState("");
   const [installingExtension, setInstallingExtension] = useState(false);
+  const activeDocumentListeners = useRef(new Set<(document: ReturnType<typeof getDocumentSnapshot>) => void>());
   const [enabledExtensions, setEnabledExtensions] = useState<Record<string, boolean>>(() => {
     try { return JSON.parse(localStorage.getItem("beagle-enabled-extensions") ?? "{}"); }
     catch { return {}; }
   });
   const extensionDisposers = useRef<Map<string, () => void>>(new Map());
+
+  function getDocumentSnapshot(tab: Tab | undefined) {
+    return tab ? { id: tab.id, name: tab.name, path: tab.path, language: tab.language, content: tab.content, dirty: tab.dirty } : null;
+  }
 
   const reloadExtensions = useCallback(async () => {
     try {
@@ -532,81 +538,6 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("beagle-enabled-extensions", JSON.stringify(enabledExtensions));
   }, [enabledExtensions]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const disposers = new Map<string, () => void>();
-    const commands: ExtensionCommand[] = [];
-
-    const activate = async () => {
-      for (const extension of extensions) {
-        const id = extension.manifest.id;
-        if (enabledExtensions[id] === false) continue;
-        if (extension.manifest.type === "theme") continue;
-        try {
-          const moduleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(extension.entry)}`;
-          const module = await import(/* @vite-ignore */ moduleUrl) as { activate?: (api: any) => unknown | Promise<unknown> };
-          if (cancelled) break;
-          const registered = new Map<string, ExtensionCommand>();
-          const result = await module.activate?.({
-            extension: extension.manifest,
-            registerCommand: (command: { id: string; title: string; run: () => void | Promise<void> }) => {
-              if (!command?.id || !command.title || typeof command.run !== "function") return () => {};
-              const fullId = `${id}.${command.id}`;
-              if (registered.has(fullId)) {
-                console.warn(`Extension ${id} registered duplicate command id: ${command.id}`);
-                return () => {};
-              }
-              const item: ExtensionCommand = {
-                id: fullId,
-                label: command.title,
-                category: extension.manifest.name,
-                extensionId: id,
-                run: async () => {
-                  try {
-                    await command.run();
-                  } catch (error) {
-                    console.error(`Extension ${id} command "${command.title}" failed:`, error);
-                    setExtensionStatus(`${extension.manifest.name}: “${command.title}” failed; see developer console`);
-                  }
-                },
-              };
-              registered.set(fullId, item);
-              commands.push(item);
-              setExtensionCommands([...commands]);
-              return () => {
-                registered.delete(fullId);
-                const index = commands.findIndex((entry) => entry.id === fullId);
-                if (index !== -1) commands.splice(index, 1);
-                setExtensionCommands([...commands]);
-              };
-            },
-            showMessage: (message: string) => window.alert(`[${extension.manifest.name}] ${String(message)}`),
-            getActiveDocument: () => {
-              const tab = activeTabRef.current;
-              return tab ? { name: tab.name, path: tab.path, language: tab.language, content: tab.content, dirty: tab.dirty } : null;
-            },
-          });
-          disposers.set(id, () => {
-            if (typeof result === "function") (result as () => void)();
-            else if (result && typeof (result as { dispose?: unknown }).dispose === "function") (result as { dispose: () => void }).dispose();
-          });
-        } catch (error) {
-          console.error(`Extension ${id} failed to activate:`, error);
-          setExtensionStatus(`${extension.manifest.name} failed to activate; see console`);
-        }
-      }
-      if (!cancelled) setExtensionCommands([...commands]);
-    };
-    setExtensionCommands([]);
-    void activate();
-    return () => {
-      cancelled = true;
-      for (const dispose of disposers.values()) {
-        try { dispose(); } catch (error) { console.error("Extension cleanup failed:", error); }
-      }
-    };
-  }, [extensions, enabledExtensions]);
 
   const [tabToClose, setTabToClose] = useState<Tab | null>(null);
 
@@ -671,6 +602,8 @@ export default function App() {
   /* ---------------- FILE SYSTEM ---------------- */
 
   const [workspaceDir, setWorkspaceDir] = useState<string | null>(null);
+  const workspaceDirRef = useRef<string | null>(workspaceDir);
+  workspaceDirRef.current = workspaceDir;
   const [bottomPanel, setBottomPanel] = useState<"problems" | "terminal" | null>(null);
   const [terminalPanelCreated, setTerminalPanelCreated] = useState(false);
   const [diagnosticsByPath, setDiagnosticsByPath] = useState<Record<string, EditorProblem[]>>({});
@@ -697,6 +630,25 @@ export default function App() {
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
   activeTabRef.current = activeTab;
+  useExtensionRuntime({
+    extensions,
+    enabledExtensions,
+    activeTabRef,
+    tabsRef,
+    workspaceDirRef,
+    editorRef,
+    setTabs,
+    setExtensionCommands,
+    setExtensionStatus,
+    activeDocumentListeners,
+  });
+  useEffect(() => {
+    const snapshot = getDocumentSnapshot(activeTabRef.current);
+    for (const listener of activeDocumentListeners.current) {
+      try { listener(snapshot); }
+      catch (error) { console.error("Extension active-document listener failed:", error); }
+    }
+  }, [activeTabId]);
   const isMarkdown = activeTab?.language === "markdown";
   const activeModelUri = useMemo(
     () => (activeTab ? getModelUriForTab(activeTab).toString() : null),

@@ -186,7 +186,95 @@ When a document is open, the returned object has:
 | `content` | `string` | Current content snapshot. |
 | `dirty` | `boolean` | Whether the tab has unsaved changes. |
 
-This is read-only snapshot data. It does not provide an API to edit the document or subscribe to document changes.
+The snapshot includes `id`, a session-local identifier for the open tab. The returned object is a snapshot, not a live object; read it again to get current values.
+
+### `api.getOpenDocuments()`
+
+Returns an array of snapshots for all open tabs, using the same fields as `getActiveDocument()`. The array and its objects are snapshots; changing them does not change editor state.
+
+### `api.getWorkspaceDirectory()`
+
+Returns the current workspace folder path, or `null` when no folder is open.
+
+### `api.readFile(path)` and `api.writeFile(path, content)`
+
+Read UTF-8 text from a path or write UTF-8 text to a path. Both return promises; filesystem errors reject the promise. `writeFile` updates the content and saved state of an already-open tab at the same path. These APIs use the editor's filesystem backend and are not restricted to the current workspace, so only use paths you trust.
+
+### `api.searchWorkspace(query)`
+
+Searches file contents in the open workspace and returns matches with `path`, `line`, and `text` fields. Returns an empty array for a blank query and rejects if no workspace is open or a search fails.
+
+### `api.getEditorSelection()`
+
+Returns `null` if there is no active editor model. Otherwise returns the selected `text`, `startLineNumber`, `startColumn`, `endLineNumber`, `endColumn`, and `isEmpty` fields.
+
+### `api.replaceEditorSelection(text)`
+
+Replaces the current editor selection with the supplied string, focuses the editor, and returns `true`. Returns `false` if there is no active editor selection/model. The replacement is an editor edit, so the document becomes modified. `text` must be a string.
+
+### `api.getEditorPosition()`
+
+Returns the cursor position as `{ lineNumber, column }`, or `null` when no editor position is available. Both coordinates are one-based.
+
+### `api.setEditorPosition(lineNumber, column)`
+
+Moves the cursor to the requested one-based line and column, reveals it in the editor, and focuses the editor. Coordinates are clamped to the document's valid range. Returns `true` on success or `false` if the editor is unavailable or the coordinates are invalid.
+
+### `api.insertTextAtCursor(text)`
+
+Inserts text at the current cursor position and focuses the editor. Returns `true` if inserted or `false` if no active editor position is available. The edit marks the document as modified.
+
+Example — uppercase selected text:
+
+```js
+export function activate(api) {
+  return api.registerCommand({
+    id: "uppercase-selection",
+    title: "Uppercase Selection",
+    run: () => {
+      const selection = api.getEditorSelection();
+      if (!selection || selection.isEmpty) {
+        api.showMessage("Select some text first.");
+        return;
+      }
+      api.replaceEditorSelection(selection.text.toUpperCase());
+    },
+  });
+}
+```
+
+### `api.updateActiveDocument(content)`
+
+Replaces the active document's entire content and marks the tab as having unsaved changes. Returns `true` if a document was open and updated, or `false` if no document was active. `content` must be a string. This is a whole-document replacement API, not a range-edit API; keep a copy of the original text if you need to compute a diff.
+
+### `api.onDidChangeActiveDocument(listener)`
+
+Subscribes to active-tab changes. The listener is called immediately with the current document snapshot (or `null`), then again when the active tab changes. Returns an unsubscribe function; call it during cleanup. Listener errors are caught and logged so they do not break the editor.
+
+Example:
+
+```js
+export function activate(api) {
+  const unsubscribe = api.onDidChangeActiveDocument((document) => {
+    console.log("Active document:", document?.path ?? document?.name ?? "None");
+  });
+
+  const command = api.registerCommand({
+    id: "uppercase-document",
+    title: "Uppercase Active Document",
+    run: () => {
+      const document = api.getActiveDocument();
+      if (!document) return api.showMessage("Open a document first.");
+      api.updateActiveDocument(document.content.toUpperCase());
+    },
+  });
+
+  return () => {
+    unsubscribe();
+    command();
+  };
+}
+```
 
 ## 6. Lifecycle and cleanup
 
@@ -206,7 +294,7 @@ The current API is intentionally small. It does **not** currently provide:
 - VS Code extension compatibility or a package marketplace.
 - A dependency manager or extension installer.
 - Editor decorations, custom editor actions, or custom sidebar panels.
-- A document-editing API or document-change events.
+- Fine-grained document change events, range-based edits beyond replacing the current selection, or an editor save-command API.
 - A stable public API guarantee across releases.
 - A sandbox or permission system. Extensions execute in the editor web view and should be treated as trusted code.
 
