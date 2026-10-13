@@ -1449,7 +1449,7 @@ export default function App() {
                   />
                 )}
 
-                {sidebarView === "git" && <SourceControl></SourceControl>}
+                {sidebarView === "git" && <SourceControl root={workspaceDir} />}
 
                 {sidebarView === "extensions" && (
                   <ExtensionsView
@@ -1596,6 +1596,7 @@ export default function App() {
                   (previewMode === "preview" || previewMode === "split") && (
                     <div style={{ flex: 1 }}>
                       <Editor
+                        className="editor-host"
                         path={activeModelUri ?? undefined}
                         saveViewState={true}
                         keepCurrentModel={true}
@@ -1676,6 +1677,7 @@ export default function App() {
               </div>
             ) : (
               <Editor
+                className="editor-host"
                 path={activeModelUri ?? undefined}
                 saveViewState={true}
                 keepCurrentModel={true}

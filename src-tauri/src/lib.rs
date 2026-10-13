@@ -1,4 +1,5 @@
 pub mod fs;
+pub mod git;
 pub mod lsp;
 pub mod search;
 
@@ -83,6 +84,13 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .invoke_handler(tauri::generate_handler![
+            git::git_status,
+            git::git_init,
+            git::git_stage,
+            git::git_unstage,
+            git::git_commit,
+            git::git_push,
+            git::git_pull,
             read_dir,
             fs::list_extensions,
             fs::extensions_directory,

@@ -230,6 +230,27 @@ body {
   overflow: hidden;
 }
 
+/* Monaco's content width can be enormous for a single unwrapped line. Keep
+   its React host constrained so that intrinsic editor width never expands
+   the main grid or the whole window. */
+.editor-host {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.markdown-split,
+.markdown-split > div {
+  min-width: 0;
+  min-height: 0;
+}
+
+.markdown-split > div {
+  flex: 1 1 0%;
+}
+
 .welcome {
   height: 100%;
 
@@ -1256,6 +1277,38 @@ body {
   gap: 10px;
   overflow-y: auto;
 }
+
+.sc-title { display: flex; align-items: center; justify-content: space-between; }
+.sc-title button, .sc-change button {
+  display: inline-grid; place-items: center; width: 25px; height: 25px;
+  border: 1px solid transparent; background: transparent; color: var(--muted); cursor: pointer;
+}
+.sc-title button:hover, .sc-change button:hover { background: var(--surface-hover); color: var(--text); border-color: var(--border); }
+.sc-title button:disabled, .sc-change button:disabled { opacity: .45; cursor: default; }
+.sc-branch { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 12px; }
+.sc-branch strong { color: var(--text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sc-branch span { margin-left: auto; white-space: nowrap; }
+.sc-commit-form { display: flex; flex-direction: column; gap: 8px; }
+.sc-commit-form textarea { width: 100%; resize: vertical; padding: 9px; border: 1px solid var(--border); background: var(--background); color: var(--text); font: inherit; font-size: 12px; outline: none; }
+.sc-commit-form textarea:focus { border-color: var(--accent); }
+.sc-primary-action, .sc-empty button { display: flex; align-items: center; justify-content: center; gap: 7px; padding: 8px 10px; border: 1px solid var(--accent); background: var(--accent); color: white; font-size: 12px; cursor: pointer; }
+.sc-primary-action:disabled, .sc-empty button:disabled, .sc-remote-actions button:disabled { opacity: .5; cursor: default; }
+.sc-section-title { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; padding-bottom: 7px; border-bottom: 1px solid var(--border); color: var(--text); font-size: 11px; font-weight: 650; }
+.sc-section-title span:last-child { color: var(--muted); font-variant-numeric: tabular-nums; }
+.sc-change { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 4px 0; font-size: 11px; }
+.sc-status-code { flex: 0 0 16px; color: var(--accent); font-weight: 700; text-align: center; }
+.sc-status-code.new { color: #16a34a; }
+.sc-status-code.staged { color: #16a34a; }
+.sc-change-path { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.sc-change button { flex: 0 0 25px; }
+.sc-muted { color: var(--muted); font-size: 11px; line-height: 1.5; }
+.sc-error { margin: 0; padding: 8px; background: var(--surface-hover); color: var(--text); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+.sc-remote-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 18px; }
+.sc-remote-actions button { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 7px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 11px; cursor: pointer; }
+.sc-remote-actions button:hover { background: var(--surface-hover); }
+.sc-empty { min-height: 230px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 20px; text-align: center; color: var(--muted); }
+.sc-empty strong { color: var(--text); font-size: 13px; }
+.sc-empty span { font-size: 12px; line-height: 1.5; }
 
 .explorer-title {
   display: flex;
