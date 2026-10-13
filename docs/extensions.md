@@ -2,11 +2,11 @@
 
 This guide explains how to create, install, test, and troubleshoot extensions for BeagleEditor.
 
-> **Current scope:** BeagleEditor extensions are small local JavaScript modules. This is an early extension API, not a compatibility layer for Visual Studio Code extensions.
+> **Current scope:** BeagleEditor supports local JavaScript extensions and JSON-only color theme extensions. This is an early extension API, not a compatibility layer for Visual Studio Code extensions.
 
 ## 1. How extensions work
 
-An extension is a folder containing a `manifest.json` file and a JavaScript entry point. BeagleEditor discovers extension folders in its application configuration directory. From the **Extensions** view you can open that directory, reload the list, install an extension from a folder, enable or disable it, and remove it with confirmation.
+An extension is a folder containing a `manifest.json` file and either a JavaScript entry point or a JSON color theme. BeagleEditor discovers extension folders in its application configuration directory. From the **Extensions** view you can open that directory, reload the list, install an extension from a folder, enable or disable it, and remove it with confirmation.
 
 Each extension's entry module exports an `activate(api)` function. BeagleEditor calls it when the extension is enabled. The function can register command-palette commands and use the small API described below. Return a cleanup function (or an object with a `dispose()` method) to release resources when the extension is disabled or reloaded.
 
@@ -53,10 +53,53 @@ Fields:
 | `version` | Yes | Version string displayed by the UI, for example `1.0.0`. |
 | `description` | No | Short description displayed in the Extensions view. |
 | `main` | No | Entry filename. Defaults to `main.js`. The entry file must be directly inside the extension folder. |
+| `type` | No | Set to `"theme"` for a JSON-only color theme. Omit it for a JavaScript extension. |
+| `theme` | Theme only | Theme data filename. Defaults to `theme.json`; the file must be directly inside the extension folder. |
 
 The manifest must be valid JSON. BeagleEditor skips folders with missing or invalid manifests, blank required fields, invalid IDs, duplicate IDs, or missing/unreadable entry files. Extension IDs may contain ASCII letters, numbers, dots, hyphens, and underscores. Use a unique `id` for every extension; command IDs are prefixed with it.
 
-## 4. Your first extension
+## 4. JSON color theme extensions
+
+A color theme has no JavaScript and does not run code. Create a folder containing `manifest.json` and `theme.json`:
+
+`manifest.json`:
+
+```json
+{
+  "id": "midnight-teal",
+  "name": "Midnight Teal",
+  "version": "1.0.0",
+  "description": "A dark theme with teal accents.",
+  "type": "theme",
+  "theme": "theme.json"
+}
+```
+
+`theme.json` uses Monaco Editor's standalone theme format:
+
+```json
+{
+  "base": "vs-dark",
+  "inherit": true,
+  "rules": [
+    { "token": "comment", "foreground": "6A9955", "fontStyle": "italic" },
+    { "token": "string", "foreground": "CE9178" },
+    { "token": "keyword", "foreground": "C586C0" }
+  ],
+  "colors": {
+    "editor.background": "#101820",
+    "editor.foreground": "#D6E2E8",
+    "editorCursor.foreground": "#2DD4BF",
+    "editor.selectionBackground": "#24565A"
+  }
+}
+```
+
+Install the folder from the **Extensions** view, enable it, then open **Settings → Editor color theme** and select it. Choose **Match interface appearance** to return to the built-in theme that follows the Dark/Light/System interface setting. Disabling a theme extension makes it unavailable for selection. Theme files are parsed as JSON and registered with Monaco; no JavaScript entry point is loaded for them.
+
+See [`examples/extensions/midnight-teal`](../examples/extensions/midnight-teal) for a complete working theme extension.
+
+## 5. Your first JavaScript extension
 
 Put this in `main.js`:
 

@@ -2203,6 +2203,7 @@ button:focus-visible,
 .extension-card-content { flex: 1; min-width: 0; }
 .extension-card-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 7px; font-size: 12px; font-weight: 650; }
 .extension-card-title span { color: var(--muted); font-size: 10px; font-weight: 400; }
+.extension-type-label { display: inline-block; margin-top: 5px; color: var(--accent); font-size: 10px; }
 .extension-toggle { flex: 0 0 auto; border: 1px solid var(--border); border-radius: 7px; padding: 6px 8px; background: transparent; color: var(--text); font-size: 10px; cursor: pointer; }
 .extension-toggle.enabled { display: inline-flex; align-items: center; gap: 4px; background: var(--surface-hover); }
 .extension-remove-button { flex: 0 0 auto; padding: 6px !important; color: var(--muted); }
@@ -2264,4 +2265,81 @@ button:focus-visible,
 .app-shell:has(.app.theme-dark),
 .app-shell:has(.app.theme-light) {
   --accent: #3b82f6;
+}
+
+/* Extension themes use Monaco's semantic color IDs across the whole UI,
+   not just the code surface. The shell also hosts overlays and the titlebar. */
+.app-shell[data-color-theme="extension"],
+.app[data-color-theme="extension"] {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app-shell[data-color-theme="extension"] .titlebar {
+  background: var(--titlebar-bg, var(--surface)) !important;
+  color: var(--text);
+}
+
+.app-shell[data-color-theme="extension"] .titlebar.theme-dark .titlebar-search,
+.app-shell[data-color-theme="extension"] .titlebar.theme-light .titlebar-search {
+  background: var(--input-bg, var(--bg));
+  color: var(--text);
+  border-color: var(--input-border, var(--border));
+}
+
+.app-shell[data-color-theme="extension"] .titlebar-search::placeholder,
+.app-shell[data-color-theme="extension"] .quickopen-input::placeholder {
+  color: var(--muted);
+}
+
+.app-shell[data-color-theme="extension"] .sidebar,
+.app-shell[data-color-theme="extension"] .sidebar-container {
+  background: var(--sidebar-bg, var(--surface));
+}
+
+.app-shell[data-color-theme="extension"] .status-bar {
+  background: var(--statusbar-bg, var(--surface));
+  color: var(--statusbar-text, var(--text));
+}
+
+.app-shell[data-color-theme="extension"] .quickopen.theme-dark,
+.app-shell[data-color-theme="extension"] .quickopen.theme-light,
+.app-shell[data-color-theme="extension"] .quickopen-results {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.app-shell[data-color-theme="extension"] .quickopen-input {
+  background: var(--input-bg, var(--bg));
+  color: var(--text);
+}
+
+.app-shell[data-color-theme="extension"] .quickopen-item {
+  color: var(--text);
+}
+
+.app-shell[data-color-theme="extension"] .quickopen-item:hover,
+.app-shell[data-color-theme="extension"] .quickopen-item.selected {
+  background: var(--surface-hover);
+}
+
+.app-shell[data-color-theme="extension"] .command-palette-backdrop {
+  --bg: var(--theme-app-bg);
+  --surface: var(--theme-app-surface);
+  --surface-hover: var(--theme-app-hover);
+  --border: var(--theme-app-border);
+  --text: var(--theme-app-text);
+  --muted: var(--theme-app-muted);
+  --accent: var(--theme-app-accent);
+}
+
+.app-shell[data-color-theme="extension"] .command-palette-backdrop.theme-dark,
+.app-shell[data-color-theme="extension"] .command-palette-backdrop.theme-light {
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+}
+
+.app-shell[data-color-theme="extension"] input,
+.app-shell[data-color-theme="extension"] textarea,
+.app-shell[data-color-theme="extension"] select {
+  accent-color: var(--accent);
 }

@@ -1,5 +1,6 @@
 export type Settings = {
   theme: "dark" | "light" | "system";
+  colorTheme: string;
   sidebarWidth: number;
   fontSize: number;
   fontFamily: string;
@@ -32,6 +33,7 @@ export type Settings = {
 
 export const defaultSettings: Settings = {
   theme: "dark",
+  colorTheme: "auto",
   sidebarWidth: 280,
   fontSize: 14,
   fontFamily: "Consolas, 'Courier New', monospace",

@@ -1,7 +1,7 @@
 import { Check, ExternalLink, FolderPlus, Puzzle, RefreshCw, Trash2 } from "lucide-react";
 
 type Extension = {
-  manifest: { id: string; name: string; version: string; description?: string };
+  manifest: { id: string; name: string; version: string; description?: string; type?: string };
   path: string;
 };
 
@@ -22,7 +22,7 @@ export default function ExtensionsView({ extensions, status, directory, enabled,
   return (
     <section className="extensions-view">
       <header className="extensions-header">
-        <div><div className="search-title">EXTENSIONS</div><p>Extend BeagleEditor with local plugins.</p></div>
+        <div><div className="search-title">EXTENSIONS</div><p>Add JavaScript tools and JSON color themes.</p></div>
         <button className="extensions-icon-button" onClick={onInstall} disabled={installing} title="Install from folder" aria-label="Install extension from folder"><FolderPlus size={15} /></button>
         <button className="extensions-icon-button" onClick={onReload} title="Reload extensions" aria-label="Reload extensions"><RefreshCw size={15} /></button>
       </header>
@@ -37,7 +37,7 @@ export default function ExtensionsView({ extensions, status, directory, enabled,
         <div className="extensions-empty">
           <Puzzle size={27} strokeWidth={1.5} />
           <strong>No extensions installed</strong>
-          <p>Create a folder in the extension directory with a <code>manifest.json</code> and a <code>main.js</code> entry point, then reload.</p>
+          <p>Add an extension folder with a <code>manifest.json</code> and either a JavaScript entry point or JSON theme file, then reload.</p>
           <p className="extensions-example">manifest.json example</p>
           <pre>{'{\n  "id": "hello-world",\n  "name": "Hello World",\n  "version": "1.0.0",\n  "main": "main.js"\n}'}</pre>
         </div>
@@ -49,6 +49,7 @@ export default function ExtensionsView({ extensions, status, directory, enabled,
               <div className="extension-card-icon"><Puzzle size={17} /></div>
               <div className="extension-card-content">
                 <div className="extension-card-title">{manifest.name}<span>v{manifest.version}</span></div>
+                {manifest.type === "theme" && <span className="extension-type-label">Color theme</span>}
                 <p>{manifest.description || "No description provided."}</p>
                 <code title={manifest.id}>{manifest.id}</code>
               </div>
@@ -60,7 +61,7 @@ export default function ExtensionsView({ extensions, status, directory, enabled,
           })}
         </div>
       )}
-      <footer className="extensions-footer">Only install extensions you trust. Enabled extensions execute JavaScript inside the editor.</footer>
+      <footer className="extensions-footer">Only install extensions you trust. JavaScript extensions execute inside the editor; color themes use JSON data only.</footer>
     </section>
   );
 }

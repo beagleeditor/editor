@@ -1,0 +1,8 @@
+{
+  "id": "midnight-teal",
+  "name": "Midnight Teal",
+  "version": "1.0.0",
+  "description": "A dark editor theme with teal accents.",
+  "type": "theme",
+  "theme": "theme.json"
+}

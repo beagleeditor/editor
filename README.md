@@ -94,3 +94,17 @@ An entry point exports `activate(api)`. The initial API supports `api.registerCo
 See [`examples/extensions/hello-world`](examples/extensions/hello-world) for a working starter. Extensions execute JavaScript inside the editor and are **not sandboxed**; only install code you trust.
 
 For installation steps, the API reference, lifecycle details, and troubleshooting, read the [Extension Development Guide](docs/extensions.md).
+
+## Documentation
+
+The documentation is organized by task so you can get started, customize the editor, and learn how its workspace tools work.
+
+- [Documentation home](docs/README.md) — guides and reference pages in one place.
+- [Getting started](docs/getting-started.md) — open a project and learn the core workflow.
+- [Keyboard shortcuts](docs/keyboard-shortcuts.md) — navigation and common commands.
+- [Editor settings and themes](docs/editor-settings.md) — customize the editor and install JSON color themes.
+- [Workspace tools](docs/workspace-tools.md) — Explorer, search, Git, terminal, and Problems.
+- [Language support](docs/language-support.md) — language servers, diagnostics, completion, and formatting.
+- [Extension development](docs/extensions.md) — create JavaScript extensions or JSON-only themes.
+- [Troubleshooting](docs/troubleshooting.md) — common setup and runtime issues.
+- [Development guide](docs/development.md) — build, test, and contribute to BeagleEditor.

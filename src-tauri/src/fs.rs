@@ -15,6 +15,9 @@ pub struct ExtensionManifest {
     pub version: String,
     pub description: Option<String>,
     pub main: Option<String>,
+    #[serde(rename = "type")]
+    pub extension_type: Option<String>,
+    pub theme: Option<String>,
 }
 
 #[derive(Serialize, Clone)]
@@ -22,6 +25,7 @@ pub struct ExtensionManifest {
 pub struct InstalledExtension {
     pub manifest: ExtensionManifest,
     pub entry: String,
+    pub theme_data: Option<serde_json::Value>,
     pub path: String,
 }
 
@@ -59,25 +63,53 @@ pub fn list_extensions(app: tauri::AppHandle) -> Result<Vec<InstalledExtension>,
         if item.file_name().to_str() != Some(manifest.id.as_str()) {
             continue;
         }
-        let entry_name = manifest.main.as_deref().unwrap_or("main.js");
-        let entry_path = item.path().join(entry_name);
-        // Keep the entry point inside the extension directory.
-        if entry_path.parent() != Some(item.path().as_path()) || !entry_path.is_file() {
-            continue;
-        }
+        let is_theme = manifest.extension_type.as_deref() == Some("theme");
+        let (entry, theme_data) = if is_theme {
+            let theme_name = manifest.theme.as_deref().unwrap_or("theme.json");
+            let theme_path = Path::new(theme_name);
+            if theme_path.components().count() != 1
+                || theme_path.file_name().and_then(|s| s.to_str()) != Some(theme_name)
+            {
+                continue;
+            }
+            let data = match fs::read_to_string(item.path().join(theme_name))
+                .ok()
+                .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+            {
+                Some(data) if valid_monaco_theme(&data) => data,
+                _ => continue,
+            };
+            (String::new(), Some(data))
+        } else {
+            if manifest
+                .extension_type
+                .as_deref()
+                .is_some_and(|kind| kind != "javascript" && kind != "extension")
+            {
+                continue;
+            }
+            let entry_name = manifest.main.as_deref().unwrap_or("main.js");
+            let entry_path = item.path().join(entry_name);
+            // Keep the entry point inside the extension directory.
+            if entry_path.parent() != Some(item.path().as_path()) || !entry_path.is_file() {
+                continue;
+            }
+            let entry = match fs::read_to_string(&entry_path) {
+                Ok(source) => source,
+                Err(_) => continue,
+            };
+            (entry, None)
+        };
         if extensions
             .iter()
             .any(|extension: &InstalledExtension| extension.manifest.id == manifest.id)
         {
             continue;
         }
-        let entry = match fs::read_to_string(&entry_path) {
-            Ok(source) => source,
-            Err(_) => continue,
-        };
         extensions.push(InstalledExtension {
             manifest,
             entry,
+            theme_data,
             path: item.path().to_string_lossy().into_owned(),
         });
     }
@@ -88,6 +120,19 @@ pub fn list_extensions(app: tauri::AppHandle) -> Result<Vec<InstalledExtension>,
             .cmp(&b.manifest.name.to_lowercase())
     });
     Ok(extensions)
+}
+
+fn valid_monaco_theme(theme: &serde_json::Value) -> bool {
+    let Some(object) = theme.as_object() else {
+        return false;
+    };
+    matches!(
+        object.get("base").and_then(serde_json::Value::as_str),
+        Some("vs" | "vs-dark" | "hc-black" | "hc-light")
+    ) && object.get("rules").is_some_and(serde_json::Value::is_array)
+        && object
+            .get("colors")
+            .is_some_and(serde_json::Value::is_object)
 }
 
 fn valid_extension_id(id: &str) -> bool {
@@ -137,19 +182,45 @@ pub fn install_extension(app: tauri::AppHandle, source: String) -> Result<String
         );
     }
 
-    let entry_name = manifest.main.as_deref().unwrap_or("main.js");
-    let entry_path = Path::new(entry_name);
-    if entry_path.components().count() != 1
-        || entry_path.file_name().and_then(|s| s.to_str()) != Some(entry_name)
-    {
-        return Err(
-            "The extension entry point must be a file directly inside the extension folder.".into(),
-        );
-    }
-    if !source.join(entry_name).is_file() {
-        return Err(format!(
-            "The extension entry point '{entry_name}' was not found."
-        ));
+    if manifest.extension_type.as_deref() == Some("theme") {
+        let theme_name = manifest.theme.as_deref().unwrap_or("theme.json");
+        let theme_path = Path::new(theme_name);
+        if theme_path.components().count() != 1
+            || theme_path.file_name().and_then(|s| s.to_str()) != Some(theme_name)
+        {
+            return Err("The theme JSON file must be directly inside the extension folder.".into());
+        }
+        let theme_text = fs::read_to_string(source.join(theme_name)).map_err(|_| {
+            format!("The theme file '{theme_name}' was not found or could not be read.")
+        })?;
+        let theme_data: serde_json::Value =
+            serde_json::from_str(&theme_text).map_err(|e| format!("Invalid theme JSON: {e}"))?;
+        if !valid_monaco_theme(&theme_data) {
+            return Err("Theme JSON must contain a supported 'base', a 'rules' array, and a 'colors' object.".into());
+        }
+    } else {
+        if manifest
+            .extension_type
+            .as_deref()
+            .is_some_and(|kind| kind != "javascript" && kind != "extension")
+        {
+            return Err("Unsupported extension type. Use 'javascript' or 'theme'.".into());
+        }
+        let entry_name = manifest.main.as_deref().unwrap_or("main.js");
+        let entry_path = Path::new(entry_name);
+        if entry_path.components().count() != 1
+            || entry_path.file_name().and_then(|s| s.to_str()) != Some(entry_name)
+        {
+            return Err(
+                "The extension entry point must be a file directly inside the extension folder."
+                    .into(),
+            );
+        }
+        if !source.join(entry_name).is_file() {
+            return Err(format!(
+                "The extension entry point '{entry_name}' was not found."
+            ));
+        }
     }
 
     let base = app
@@ -468,6 +539,24 @@ pub fn rename_path(old_path: String, new_path: String) -> Result<(), String> {
 #[cfg(test)]
 mod file_operation_tests {
     use super::*;
+
+    #[test]
+    fn validates_monaco_theme_json_without_a_javascript_entry() {
+        let valid = serde_json::json!({
+            "base": "vs-dark",
+            "inherit": true,
+            "rules": [{ "token": "comment", "foreground": "6A9955" }],
+            "colors": { "editor.background": "#101820" }
+        });
+        assert!(valid_monaco_theme(&valid));
+
+        assert!(!valid_monaco_theme(
+            &serde_json::json!({ "base": "unknown", "rules": [], "colors": {} })
+        ));
+        assert!(!valid_monaco_theme(
+            &serde_json::json!({ "base": "vs-dark", "rules": [] })
+        ));
+    }
 
     #[test]
     fn create_file_refuses_to_overwrite_and_does_not_create_parents() {

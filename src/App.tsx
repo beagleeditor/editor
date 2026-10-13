@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import * as monaco from "monaco-editor";
@@ -49,12 +49,56 @@ type SidebarView = "files" | "search" | "git" | "extensions" | "settings";
 export type Theme = "dark" | "light" | "system";
 
 type InstalledExtension = {
-  manifest: { id: string; name: string; version: string; description?: string; main?: string };
+  manifest: { id: string; name: string; version: string; description?: string; main?: string; type?: string; theme?: string };
   entry: string;
+  themeData?: monaco.editor.IStandaloneThemeData;
   path: string;
 };
 
 type ExtensionCommand = PaletteCommand & { extensionId: string };
+
+function colorThemeStyle(themeData: monaco.editor.IStandaloneThemeData | undefined): CSSProperties | undefined {
+  if (!themeData) return undefined;
+  const colors = themeData.colors ?? {};
+  const pick = (...keys: string[]) => {
+    for (const key of keys) {
+      const value = colors[key];
+      if (typeof value === "string" && value.trim()) return value.startsWith("#") || value.startsWith("rgba(") || value.startsWith("rgb(") || value.startsWith("hsla(") || value.startsWith("hsl(") ? value : `#${value}`;
+    }
+    return undefined;
+  };
+  const base = themeData.base === "vs" ? "light" : "dark";
+  const fallback = base === "dark"
+    ? { bg: "#171717", surface: "#202020", hover: "#2b2b2b", border: "#383838", text: "#eeeeee", muted: "#a2a2a2", accent: "#3b82f6" }
+    : { bg: "#f4f4f4", surface: "#ffffff", hover: "#eaeaea", border: "#d6d6d6", text: "#222222", muted: "#666666", accent: "#3b82f6" };
+  return {
+    colorScheme: base,
+    "--bg": pick("editor.background") ?? fallback.bg,
+    "--surface": pick("sideBar.background", "panel.background", "editorWidget.background", "titleBar.activeBackground", "editor.lineHighlightBackground") ?? fallback.surface,
+    "--surface-hover": pick("list.hoverBackground", "list.activeSelectionBackground", "editor.lineHighlightBackground", "editor.selectionBackground") ?? fallback.hover,
+    "--border": pick("contrastBorder", "sideBar.border", "panel.border", "editorWidget.border", "editorGroup.border", "editor.lineHighlightBorder") ?? fallback.border,
+    "--text": pick("foreground", "editor.foreground") ?? fallback.text,
+    "--muted": pick("descriptionForeground", "sideBarSectionHeader.foreground", "editorLineNumber.foreground") ?? fallback.muted,
+    "--accent": pick("focusBorder", "button.background", "editorCursor.foreground") ?? fallback.accent,
+    "--sidebar-bg": pick("sideBar.background") ?? fallback.surface,
+    "--panel-bg": pick("panel.background") ?? fallback.surface,
+    "--titlebar-bg": pick("titleBar.activeBackground") ?? fallback.surface,
+    "--input-bg": pick("input.background") ?? fallback.bg,
+    "--input-border": pick("input.border") ?? pick("contrastBorder", "panel.border") ?? fallback.border,
+    "--selection-bg": pick("editor.selectionBackground") ?? fallback.hover,
+    "--tab-active-bg": pick("tab.activeBackground") ?? fallback.bg,
+    "--tab-inactive-bg": pick("tab.inactiveBackground") ?? fallback.surface,
+    "--statusbar-bg": pick("statusBar.background") ?? fallback.surface,
+    "--statusbar-text": pick("statusBar.foreground") ?? fallback.text,
+    "--theme-app-bg": pick("editor.background") ?? fallback.bg,
+    "--theme-app-surface": pick("sideBar.background", "panel.background", "editorWidget.background", "titleBar.activeBackground", "editor.lineHighlightBackground") ?? fallback.surface,
+    "--theme-app-hover": pick("list.hoverBackground", "list.activeSelectionBackground", "editor.lineHighlightBackground", "editor.selectionBackground") ?? fallback.hover,
+    "--theme-app-border": pick("contrastBorder", "sideBar.border", "panel.border", "editorWidget.border", "editorGroup.border", "editor.lineHighlightBorder") ?? fallback.border,
+    "--theme-app-text": pick("foreground", "editor.foreground") ?? fallback.text,
+    "--theme-app-muted": pick("descriptionForeground", "sideBarSectionHeader.foreground", "editorLineNumber.foreground") ?? fallback.muted,
+    "--theme-app-accent": pick("focusBorder", "button.background", "editorCursor.foreground") ?? fallback.accent,
+  } as CSSProperties;
+}
 
 loader.config({ monaco });
 
@@ -467,6 +511,14 @@ export default function App() {
         invoke<InstalledExtension[]>("list_extensions"),
         invoke<string>("extensions_directory"),
       ]);
+      for (const extension of installed) {
+        if (extension.manifest.type !== "theme" || !extension.themeData) continue;
+        try {
+          monaco.editor.defineTheme(`extension-${extension.manifest.id}`, extension.themeData);
+        } catch (error) {
+          console.error(`Could not register color theme ${extension.manifest.id}:`, error);
+        }
+      }
       setExtensions(installed);
       setExtensionsDirectory(directory);
       setExtensionStatus(installed.length ? `${installed.length} extension${installed.length === 1 ? "" : "s"} found` : "No extensions installed yet");
@@ -490,6 +542,7 @@ export default function App() {
       for (const extension of extensions) {
         const id = extension.manifest.id;
         if (enabledExtensions[id] === false) continue;
+        if (extension.manifest.type === "theme") continue;
         try {
           const moduleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(extension.entry)}`;
           const module = await import(/* @vite-ignore */ moduleUrl) as { activate?: (api: any) => unknown | Promise<unknown> };
@@ -601,7 +654,18 @@ export default function App() {
     store.save();
   }, [sidebarWidth, store]);
 
-  const theme = settings.theme === "system" ? systemTheme : settings.theme;
+  const baseTheme = settings.theme === "system" ? systemTheme : settings.theme;
+  const availableColorThemes = extensions.filter((extension) =>
+    extension.manifest.type === "theme" && extension.themeData && enabledExtensions[extension.manifest.id] !== false,
+  );
+  const selectedExtensionTheme = availableColorThemes.find((extension) => extension.manifest.id === settings.colorTheme);
+  const theme = selectedExtensionTheme
+    ? selectedExtensionTheme.themeData?.base === "vs" ? "light" : "dark"
+    : baseTheme;
+  const editorTheme = selectedExtensionTheme
+    ? `extension-${selectedExtensionTheme.manifest.id}`
+    : theme === "dark" ? "beagle-dark" : "beagle-light";
+  const themeStyle = colorThemeStyle(selectedExtensionTheme?.themeData);
 
   /* ---------------- FILE SYSTEM ---------------- */
 
@@ -1457,7 +1521,7 @@ export default function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-color-theme={selectedExtensionTheme ? "extension" : undefined} style={themeStyle}>
       {commandPaletteVisible && <CommandPalette theme={theme} commands={commands} query={commandPaletteQuery} onClose={() => { setCommandPaletteVisible(false); setCommandPaletteQuery(""); }} />}
       {quickOpenVisible && (
         <QuickOpen
@@ -1484,7 +1548,7 @@ export default function App() {
         commandQuery={commandPaletteQuery}
         onCommandQueryChange={setCommandPaletteQuery}
       />
-      <div className={`app theme-${theme}`}>
+      <div className={`app theme-${theme}`} data-color-theme={selectedExtensionTheme ? "extension" : undefined} style={themeStyle}>
         <div className="workspace">
           <ActivityBar
             active={sidebarView}
@@ -1586,7 +1650,11 @@ export default function App() {
                 )}
 
                 {sidebarView === "settings" && (
-                  <SettingsPage settings={settings} update={update} />
+                  <SettingsPage
+                    settings={settings}
+                    update={update}
+                    colorThemes={availableColorThemes.map((extension) => ({ id: extension.manifest.id, name: extension.manifest.name }))}
+                  />
                 )}
               </div>
 
@@ -1724,9 +1792,7 @@ export default function App() {
                             syncEditorScroll(editor);
                           });
                         }}
-                        theme={
-                          theme === "dark" ? "beagle-dark" : "beagle-light"
-                        }
+                        theme={editorTheme}
                         options={{
                           automaticLayout: true,
                           ...editorOptions(settings),
@@ -1869,7 +1935,7 @@ export default function App() {
                     ]);
                   });
                 }}
-                theme={theme === "dark" ? "beagle-dark" : "beagle-light"}
+                theme={editorTheme}
                 options={{
                   automaticLayout: true,
                   ...editorOptions(settings),

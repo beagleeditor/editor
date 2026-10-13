@@ -5,6 +5,7 @@ import Dialog from "./Dialog";
 type Props = {
   settings: Settings;
   update: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
+  colorThemes: { id: string; name: string }[];
 };
 
 type SettingRowProps = { label: string; description?: string; children: ReactNode };
@@ -32,7 +33,7 @@ function Toggle({ label, description, value, onChange }: {
   </SettingRow>;
 }
 
-export default function SettingsPage({ settings, update }: Props) {
+export default function SettingsPage({ settings, update, colorThemes }: Props) {
   const [confirmReset, setConfirmReset] = useState(false);
 
   const reset = () => {
@@ -54,9 +55,15 @@ export default function SettingsPage({ settings, update }: Props) {
 
       <div className="settings-content">
         <div className="settings-section">Appearance</div>
-        <SettingRow label="Color theme" description="Choose the editor interface appearance.">
+        <SettingRow label="Interface theme" description="Choose the application interface appearance.">
           <select value={settings.theme} onChange={(event) => update("theme", event.target.value as Settings["theme"])}>
             <option value="dark">Dark</option><option value="light">Light</option><option value="system">Follow system</option>
+          </select>
+        </SettingRow>
+        <SettingRow label="Editor color theme" description="Use a built-in theme or an installed theme extension.">
+          <select value={settings.colorTheme} onChange={(event) => update("colorTheme", event.target.value)}>
+            <option value="auto">Match interface appearance</option>
+            {colorThemes.map((theme) => <option key={theme.id} value={theme.id}>{theme.name}</option>)}
           </select>
         </SettingRow>
         <SettingRow label="Sidebar width" description="Width in pixels; drag the sidebar divider for a quick adjustment.">
