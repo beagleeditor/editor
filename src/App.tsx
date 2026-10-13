@@ -531,6 +531,7 @@ export default function App() {
 
   const [quickOpenVisible, setQuickOpenVisible] = useState(false);
   const [commandPaletteVisible, setCommandPaletteVisible] = useState(false);
+  const [commandPaletteQuery, setCommandPaletteQuery] = useState("");
   const [quickOpenQuery, setQuickOpenQuery] = useState("");
   const [line, setLine] = useState(1);
   const [column, setColumn] = useState(1);
@@ -1256,7 +1257,10 @@ export default function App() {
     const handleShortcut = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === "p") {
         event.preventDefault();
-        setCommandPaletteVisible((visible) => !visible);
+        setCommandPaletteVisible((visible) => {
+          setCommandPaletteQuery("");
+          return !visible;
+        });
         setQuickOpenVisible(false);
       }
     };
@@ -1274,7 +1278,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      {commandPaletteVisible && <CommandPalette theme={theme} commands={commands} onClose={() => setCommandPaletteVisible(false)} />}
+      {commandPaletteVisible && <CommandPalette theme={theme} commands={commands} query={commandPaletteQuery} onClose={() => { setCommandPaletteVisible(false); setCommandPaletteQuery(""); }} />}
       {quickOpenVisible && (
         <QuickOpen
           theme={theme}
@@ -1296,6 +1300,9 @@ export default function App() {
         onOpenQuickOpen={() => {
           setQuickOpenVisible(true);
         }}
+        commandPaletteOpen={commandPaletteVisible}
+        commandQuery={commandPaletteQuery}
+        onCommandQueryChange={setCommandPaletteQuery}
       />
       <div className={`app theme-${theme}`}>
         <div className="workspace">
