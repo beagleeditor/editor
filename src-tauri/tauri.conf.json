@@ -13,8 +13,8 @@
     "windows": [
       {
         "title": "BeagleEditor",
-        "width": 950,
-        "height": 800,
+        "width": 1280,
+        "height": 900,
         "resizable": true,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true
