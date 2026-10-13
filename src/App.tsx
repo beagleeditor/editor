@@ -868,6 +868,12 @@ export default function App() {
     }
   };
 
+  const closeFolder = useCallback(() => {
+    setWorkspaceDir(null);
+    setFileTree(null);
+    if (tabsRef.current.length === 0) setShowWelcome(true);
+  }, []);
+
   const openFileFromExplorer = async (path: string) => {
     const existing = tabs.find((tab) => tab.path === path);
     if (existing) {
@@ -1325,6 +1331,7 @@ export default function App() {
     { id: "file.new", label: "New File", category: "File", shortcut: "⌘ N", run: newFile },
     { id: "file.open", label: "Open File…", category: "File", shortcut: "⌘ O", run: openFile },
     { id: "workspace.open", label: "Open Folder…", category: "Workspace", shortcut: "⌘ ⇧ O", run: openFolder },
+    { id: "workspace.close", label: "Close Folder", category: "Workspace", run: closeFolder },
     { id: "file.save", label: "Save File", category: "File", shortcut: "⌘ S", run: saveFile },
     { id: "editor.format", label: "Format Document", category: "Editor", shortcut: "⌘ ⇧ I", run: formatActiveDocument },
     { id: "view.explorer", label: "Show Explorer", category: "View", run: () => { setSidebarView("files"); setSidebarVisible(true); } },
@@ -1335,7 +1342,7 @@ export default function App() {
     { id: "help.about", label: "About BeagleEditor", category: "Help", run: openAbout },
     { id: "view.toggle-sidebar", label: "Toggle Sidebar", category: "View", run: () => setSidebarVisible((visible) => !visible) },
     ...extensionCommands,
-  ], [newFile, openFile, openFolder, saveFile, formatActiveDocument, openSettings, openAbout, extensionCommands]);
+  ], [newFile, openFile, openFolder, closeFolder, saveFile, formatActiveDocument, openSettings, openAbout, extensionCommands]);
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
@@ -1415,6 +1422,7 @@ export default function App() {
                   <Explorer
                     tree={fileTree}
                     onOpenFolder={openFolder}
+                    onCloseFolder={closeFolder}
                     onOpenFile={openFileFromExplorer}
                     onReload={reloadWorkspace}
                     // Keep compatibility with Explorer prop types

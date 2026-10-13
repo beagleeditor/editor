@@ -15,6 +15,7 @@ type Props = {
   onNewFolder: (path: string) => void;
   showCreateDialog: (type: "file" | "folder") => void;
   onOpenFolder: () => void;
+  onCloseFolder: () => void;
   onRename?: (path: string) => void;
   onDelete?: (path: string) => void;
   onRevealInFinder?: (path: string) => void;
@@ -87,6 +88,7 @@ export default function Explorer({
   onNewFolder,
   showCreateDialog,
   onOpenFolder,
+  onCloseFolder,
   onRename,
   onDelete,
   onRevealInFinder,
@@ -124,6 +126,14 @@ export default function Explorer({
 
         <div className="explorer-actions">
           {tree && <>
+            <button
+              className="explorer-action-btn"
+              title="Close Folder"
+              aria-label="Close Folder"
+              onClick={onCloseFolder}
+            >
+              <Icon icon="mdi:folder-remove-outline" width="16" />
+            </button>
             <button
               className="explorer-action-btn"
               title="New File"
