@@ -411,6 +411,7 @@ export default function App() {
   const hydratedRef = useRef(false);
   const openLock = useRef(false);
   const openFolderLock = useRef(false);
+  const saveDialogLock = useRef(false);
   const activeModelRef = useRef<monaco.editor.ITextModel | null>(null);
   // ----------- Markdown Scroll Sync -----------
   const syncEditorScroll = (editor: any) => {
@@ -761,14 +762,19 @@ export default function App() {
     let path = activeTab.path;
 
     if (!path) {
-      const selected = await save({
-        title: "Save File",
-        defaultPath: await homeDir(),
-      });
+      if (saveDialogLock.current) return;
+      saveDialogLock.current = true;
+      try {
+        const selected = await save({
+          title: "Save File",
+          defaultPath: await homeDir(),
+        });
 
-      if (!selected) return;
-
-      path = selected;
+        if (!selected) return;
+        path = selected;
+      } finally {
+        saveDialogLock.current = false;
+      }
     }
 
     await fsAPI.writeFile(path, activeTab.content);
@@ -1094,28 +1100,29 @@ export default function App() {
   ======================================================= */
 
   useEffect(() => {
-    let u1: any;
-    let u2: any;
-    let u3: any;
-    let u4: any;
-    let u5: any;
+    let cancelled = false;
+    const unlisten: Array<() => void> = [];
 
-    (async () => {
-      u1 = await listen("menu-open", openFile);
-      u2 = await listen("menu-open-folder", () => {
-        void openFolder();
-      });
-      u3 = await listen("menu-save", saveFile);
-      u4 = await listen("menu-settings", openSettings);
-      u5 = await listen("menu-about", openAbout);
-    })();
+    // `listen` is asynchronous. In React StrictMode, the effect can be
+    // cleaned up before registration resolves; unregister those late
+    // listeners immediately so one menu click cannot open several dialogs.
+    const register = async (event: string, handler: () => void | Promise<void>) => {
+      const stop = await listen(event, () => { void handler(); });
+      if (cancelled) stop();
+      else unlisten.push(stop);
+    };
+
+    void Promise.all([
+      register("menu-open", openFile),
+      register("menu-open-folder", openFolder),
+      register("menu-save", saveFile),
+      register("menu-settings", openSettings),
+      register("menu-about", openAbout),
+    ]).catch((error) => console.error("Could not register application menu events:", error));
 
     return () => {
-      u1?.();
-      u2?.();
-      u3?.();
-      u4?.();
-      u5?.();
+      cancelled = true;
+      unlisten.forEach((stop) => stop());
     };
   }, [openFile, saveFile, openSettings, openAbout]);
 
@@ -1474,11 +1481,11 @@ export default function App() {
                     installing={installingExtension}
                     onInstall={async () => {
                       if (installingExtension) return;
-                      const selected = await open({ directory: true, multiple: false, title: "Select an extension folder" });
-                      if (typeof selected !== "string") return;
                       setInstallingExtension(true);
-                      setExtensionStatus("Installing extension…");
                       try {
+                        const selected = await open({ directory: true, multiple: false, title: "Select an extension folder" });
+                        if (typeof selected !== "string") return;
+                        setExtensionStatus("Installing extension…");
                         const message = await invoke<string>("install_extension", { source: selected });
                         await reloadExtensions();
                         setExtensionStatus(message);
