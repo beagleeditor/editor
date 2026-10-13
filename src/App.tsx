@@ -1121,6 +1121,7 @@ export default function App() {
     void Promise.all([
       register("menu-open", openFile),
       register("menu-open-folder", openFolder),
+      register("menu-close-folder", closeFolder),
       register("menu-save", saveFile),
       register("menu-settings", openSettings),
       register("menu-about", openAbout),
@@ -1130,7 +1131,7 @@ export default function App() {
       cancelled = true;
       unlisten.forEach((stop) => stop());
     };
-  }, [openFile, saveFile, openSettings, openAbout]);
+}, [openFile, closeFolder, saveFile, openSettings, openAbout]);
 
   /* =======================================================
      SIDEBAR RESIZE

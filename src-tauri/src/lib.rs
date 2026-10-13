@@ -32,12 +32,19 @@ pub fn run() {
                 true,
                 Some("CmdOrCtrl+Shift+O"),
             )?;
+            let closefolder =
+                MenuItem::with_id(app, "closefolder", "Close Folder", true, None::<&str>)?;
             let save = MenuItem::with_id(app, "save", "Save", true, Some("CmdOrCtrl+S"))?;
             let quit =
                 MenuItem::with_id(app, "quit", "Quit BeagleEditor", true, Some("CmdOrCtrl+Q"))?;
 
             let file_menu =
-                Submenu::with_items(app, "File", true, &[&open, &openfolder, &save, &quit])?;
+                Submenu::with_items(
+                    app,
+                    "File",
+                    true,
+                    &[&open, &openfolder, &closefolder, &save, &quit],
+                )?;
 
             // APP INFO MENU (works everywhere, macOS just relocates it visually)
             let about = MenuItem::with_id(app, "about", "About BeagleEditor", true, None::<&str>)?;
@@ -63,6 +70,9 @@ pub fn run() {
             "openfolder" => {
                 println!("EMIT OPEN FOLDER");
                 let _ = app.emit("menu-open-folder", ());
+            }
+            "closefolder" => {
+                let _ = app.emit("menu-close-folder", ());
             }
             "save" => {
                 println!("EMIT SAVE");
