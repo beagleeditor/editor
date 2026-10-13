@@ -785,7 +785,13 @@ export default function App() {
     // Save a stable snapshot. If the user keeps typing while the write is in
     // flight, preserve the newer buffer as dirty instead of marking it saved.
     const savedContent = activeTab.content;
-    await fsAPI.writeFile(path, savedContent);
+    try {
+      await fsAPI.writeFile(path, savedContent);
+      setSaveError(null);
+    } catch (error) {
+      setSaveError(`Could not save ${path}: ${String(error)}`);
+      return;
+    }
 
     const fileName = path.split(/[/\\]/).pop() ?? activeTab.name;
 
@@ -1223,38 +1229,31 @@ export default function App() {
      RENDER
   ======================================================= */
 
-  // --- Create Dialog State ---
-  const [createType, setCreateType] = useState<"file" | "folder" | null>(null);
-  const [createPath, setCreatePath] = useState("");
-  const [createParentPath, setCreateParentPath] = useState<string | null>(null);
-  const [createError, setCreateError] = useState<string | null>(null);
   const [renameTarget, setRenameTarget] = useState<string | null>(null);
   const [renamePath, setRenamePath] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [renameError, setRenameError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // --- Create Item Handler ---
-  const createItem = async () => {
-    const basePath = createParentPath ?? workspaceDir;
-    const relativePath = createPath.trim();
-    if (!basePath || !createType || !relativePath) return;
-
-    const fullPath = `${basePath.replace(/[\\/]+$/, "")}/${relativePath}`;
-    setCreateError(null);
+  const createItem = async (type: "file" | "folder", parentPath: string, name: string): Promise<string | null> => {
+    const fullPath = `${parentPath.replace(/[\\/]+$/, "")}/${name}`;
     try {
       if (await fsAPI.exists(fullPath)) {
-        setCreateError("A file or folder already exists at that path.");
-        return;
+        return "A file or folder already exists with that name.";
       }
-      if (createType === "file") await fsAPI.createFile(fullPath);
+      if (type === "file") await fsAPI.createFile(fullPath);
       else await fsAPI.createDir(fullPath);
-
-      setCreateType(null);
-      setCreatePath("");
-      setCreateParentPath(null);
+    } catch (error) {
+      return `Could not create ${type}: ${String(error)}`;
+    }
+    try {
       await reloadWorkspace();
     } catch (error) {
-      setCreateError(`Could not create ${createType}: ${String(error)}`);
+      setSaveError(`Created ${name}, but the Explorer could not refresh: ${String(error)}`);
     }
+    return null;
   };
 
   const closeTab = (id: string) => {
@@ -1279,12 +1278,30 @@ export default function App() {
   };
 
   const renameItem = async () => {
-    if (!renameTarget || !renamePath.trim()) return;
+    if (!renameTarget || !renamePath.trim()) {
+      setRenameError("Enter a name.");
+      return;
+    }
+    const newName = renamePath.trim();
+    if (newName === "." || newName === ".." || /[\\/]/.test(newName)) {
+      setRenameError("Use a name without path separators.");
+      return;
+    }
 
     const parent = renameTarget.split(/[/\\]/).slice(0, -1).join("/");
-    const newPath = `${parent}/${renamePath}`;
-
-    await fsAPI.renamePath(renameTarget, newPath);
+    const newPath = `${parent}/${newName}`;
+    if (newPath === renameTarget) {
+      setRenameTarget(null);
+      setRenamePath("");
+      setRenameError(null);
+      return;
+    }
+    try {
+      await fsAPI.renamePath(renameTarget, newPath);
+    } catch (error) {
+      setRenameError(`Could not rename: ${String(error)}`);
+      return;
+    }
 
     setTabs((prev) =>
       prev.map((tab) => {
@@ -1294,7 +1311,7 @@ export default function App() {
           return {
             ...tab,
             path: newPath,
-            name: renamePath,
+            name: newName,
           };
         }
 
@@ -1314,20 +1331,33 @@ export default function App() {
 
     setRenameTarget(null);
     setRenamePath("");
+    setRenameError(null);
 
     if (activeTab?.path === renameTarget) {
       setActiveTabId((current) => current);
     }
 
-    await reloadWorkspace();
+    try {
+      await reloadWorkspace();
+    } catch (error) {
+      setSaveError(`Renamed successfully, but the Explorer could not refresh: ${String(error)}`);
+    }
   };
 
   const deleteItem = async () => {
     if (!deleteTarget) return;
 
     const target = deleteTarget;
-
-    await fsAPI.deletePath(target);
+    if (target === workspaceDir) {
+      setDeleteError("The workspace root cannot be deleted from the Explorer.");
+      return;
+    }
+    try {
+      await fsAPI.deletePath(target);
+    } catch (error) {
+      setDeleteError(`Could not delete: ${String(error)}`);
+      return;
+    }
 
     const remainingTabs = tabsRef.current.filter((tab) =>
       !tab.path || (tab.path !== target && !tab.path.startsWith(`${target}/`)),
@@ -1339,8 +1369,13 @@ export default function App() {
     }
 
     setDeleteTarget(null);
+    setDeleteError(null);
 
-    await reloadWorkspace();
+    try {
+      await reloadWorkspace();
+    } catch (error) {
+      setSaveError(`Deleted successfully, but the Explorer could not refresh: ${String(error)}`);
+    }
   };
 
   const allProblems = useMemo(() => Object.values(diagnosticsByPath).flat().sort((a, b) => a.severity - b.severity || a.path.localeCompare(b.path) || a.line - b.line), [diagnosticsByPath]);
@@ -1471,22 +1506,16 @@ export default function App() {
                     onCloseFolder={closeFolder}
                     onOpenFile={openFileFromExplorer}
                     onReload={reloadWorkspace}
-                    // Keep compatibility with Explorer prop types
-                    onNewFile={(_path: string) => {}}
-                    onNewFolder={(_path: string) => {}}
-                    showCreateDialog={(type, parentPath) => {
-                      setCreateType(type);
-                      setCreateParentPath(parentPath ?? workspaceDir);
-                      setCreatePath("");
-                      setCreateError(null);
-                    }}
+                    onCreateItem={createItem}
                     onRename={(path) => {
                       const name = path.split(/[/\\]/).pop() ?? "";
 
+                      setRenameError(null);
                       setRenameTarget(path);
                       setRenamePath(name);
                     }}
                     onDelete={(path) => {
+                      setDeleteError(null);
                       setDeleteTarget(path);
                     }}
                     onRevealInFinder={async (path) => {
@@ -1593,45 +1622,23 @@ export default function App() {
                 }}
               />
             )}
-            {/* Create File/Folder Dialog */}
-            {createType && (
-              <Dialog
-                title={createType === "file" ? "New File" : "New Folder"}
-                message={
-                  <>
-                    <input
-                      autoFocus
-                      value={createPath}
-                      onChange={(e) => setCreatePath(e.target.value)}
-                      placeholder={createType === "file" ? "filename.ts" : "folder-name"}
-                      style={{ width: "100%" }}
-                    />
-                    {createError && <p role="alert" style={{ color: "var(--error, #e05252)" }}>{createError}</p>}
-                  </>
-                }
-                onCancel={() => {
-                  setCreateType(null);
-                  setCreatePath("");
-                  setCreateParentPath(null);
-                  setCreateError(null);
-                }}
-                onConfirm={createItem}
-              />
-            )}
             {renameTarget && (
               <Dialog
                 title="Rename"
-                message={
+                message={<>
                   <input
                     autoFocus
                     value={renamePath}
-                    onChange={(e) => setRenamePath(e.target.value)}
+                    onChange={(e) => { setRenamePath(e.target.value); setRenameError(null); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") void renameItem(); }}
                     style={{ width: "100%" }}
                   />
-                }
+                  {renameError && <p role="alert" className="dialog-error">{renameError}</p>}
+                </>}
                 onCancel={() => {
                   setRenameTarget(null);
                   setRenamePath("");
+                  setRenameError(null);
                 }}
                 onConfirm={renameItem}
               />
@@ -1639,9 +1646,22 @@ export default function App() {
             {deleteTarget && (
               <Dialog
                 title="Delete"
-                message={`Delete ${deleteTarget.split(/[/\\]/).pop()}?`}
-                onCancel={() => setDeleteTarget(null)}
+                message={<>
+                  <p>Delete {deleteTarget.split(/[/\\]/).pop()}?</p>
+                  {deleteError && <p role="alert" className="dialog-error">{deleteError}</p>}
+                </>}
+                onCancel={() => { setDeleteTarget(null); setDeleteError(null); }}
                 onConfirm={deleteItem}
+              />
+            )}
+            {saveError && (
+              <Dialog
+                title="File operation notice"
+                message={saveError}
+                onCancel={() => setSaveError(null)}
+                onConfirm={() => setSaveError(null)}
+                confirmText="OK"
+                cancelText="Close"
               />
             )}
             {showAbout ? (

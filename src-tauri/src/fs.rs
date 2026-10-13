@@ -178,11 +178,10 @@ pub fn read_dir(path: String) -> Result<Vec<FileNode>, String> {
 
     let mut result: Vec<FileNode> = Vec::new();
 
-    for entry in entries.flatten() {
-        let file_type = match entry.file_type() {
-            Ok(t) => t,
-            Err(_) => continue,
-        };
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("Failed to read an entry in {}: {e}", path.display()))?;
+        let file_type = entry.file_type()
+            .map_err(|e| format!("Failed to inspect {}: {e}", entry.path().display()))?;
 
         let name = entry.file_name().to_string_lossy().to_string();
         let full_path = entry.path().to_string_lossy().to_string();
@@ -250,7 +249,42 @@ pub fn read_file(path: String) -> Result<String, String> {
 
 #[tauri::command]
 pub fn write_file(path: String, content: String) -> Result<(), String> {
-    fs::write(path, content).map_err(|e| e.to_string())
+    let destination = Path::new(&path);
+    let parent = destination
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+
+    if !parent.is_dir() {
+        return Err(format!("Cannot save file: parent directory does not exist: {}", parent.display()));
+    }
+
+    let existing = match fs::symlink_metadata(destination) {
+        Ok(metadata) if metadata.file_type().is_symlink() => {
+            return Err("Refusing to save through a symbolic link.".into());
+        }
+        Ok(metadata) if !metadata.is_file() => {
+            return Err("The save destination is not a regular file.".into());
+        }
+        Ok(metadata) => Some(metadata),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+        Err(error) => return Err(format!("Cannot inspect save destination: {error}")),
+    };
+
+    use std::io::Write;
+    let mut temporary = tempfile::NamedTempFile::new_in(parent)
+        .map_err(|e| format!("Could not create temporary save file: {e}"))?;
+    if let Some(metadata) = existing {
+        temporary.as_file().set_permissions(metadata.permissions())
+            .map_err(|e| format!("Could not preserve file permissions: {e}"))?;
+    }
+    temporary.write_all(content.as_bytes())
+        .map_err(|e| format!("Could not write temporary save file: {e}"))?;
+    temporary.as_file().sync_all()
+        .map_err(|e| format!("Could not flush temporary save file: {e}"))?;
+    temporary.persist(destination)
+        .map_err(|e| format!("Could not replace file safely: {}", e.error))?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -260,8 +294,13 @@ pub fn create_file(path: String) -> Result<(), String> {
 
     let p = Path::new(&path);
 
-    if let Some(parent) = p.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    if p.file_name().is_none() {
+        return Err("Cannot create a file at a filesystem root.".into());
+    }
+    if let Some(parent) = p.parent().filter(|parent| !parent.as_os_str().is_empty()) {
+        if !parent.is_dir() {
+            return Err(format!("Parent directory does not exist: {}", parent.display()));
+        }
     }
 
     OpenOptions::new()
@@ -275,7 +314,11 @@ pub fn create_file(path: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn create_dir(path: String) -> Result<(), String> {
-    std::fs::create_dir_all(path).map_err(|e| e.to_string())
+    let path = Path::new(&path);
+    if path.file_name().is_none() {
+        return Err("Cannot create a directory at a filesystem root.".into());
+    }
+    fs::create_dir(path).map_err(|e| format!("Could not create directory without replacing an existing path: {e}"))
 }
 
 #[tauri::command]
@@ -285,7 +328,14 @@ pub fn delete_path(path: String) -> Result<(), String> {
 
     let p = Path::new(&path);
 
-    if p.is_dir() {
+    let metadata = fs::symlink_metadata(p).map_err(|e| format!("Could not inspect delete target: {e}"))?;
+    if p.file_name().is_none() {
+        return Err("Refusing to delete a filesystem root.".into());
+    }
+
+    if metadata.file_type().is_symlink() {
+        fs::remove_file(p).map_err(|e| e.to_string())?;
+    } else if metadata.is_dir() {
         fs::remove_dir_all(p).map_err(|e| e.to_string())?;
     } else {
         fs::remove_file(p).map_err(|e| e.to_string())?;
@@ -296,7 +346,107 @@ pub fn delete_path(path: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn rename_path(old_path: String, new_path: String) -> Result<(), String> {
-    std::fs::rename(old_path, new_path).map_err(|e| e.to_string())
+    let old = Path::new(&old_path);
+    let new = Path::new(&new_path);
+    if old.file_name().is_none() || new.file_name().is_none() {
+        return Err("Cannot rename a filesystem root.".into());
+    }
+    fs::symlink_metadata(old).map_err(|e| format!("Could not inspect rename source: {e}"))?;
+    match fs::symlink_metadata(new) {
+        Ok(_) => return Err("A file or folder already exists at the destination.".into()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(format!("Could not inspect rename destination: {error}")),
+    }
+    let parent = new.parent().filter(|parent| !parent.as_os_str().is_empty()).unwrap_or_else(|| Path::new("."));
+    if !parent.is_dir() {
+        return Err("Rename destination parent directory does not exist.".into());
+    }
+    let old_parent = old.parent().filter(|parent| !parent.as_os_str().is_empty()).unwrap_or_else(|| Path::new("."));
+    let old_parent_canonical = fs::canonicalize(old_parent).map_err(|e| e.to_string())?;
+    let parent_canonical = fs::canonicalize(parent).map_err(|e| e.to_string())?;
+    if old_parent_canonical != parent_canonical {
+        return Err("Rename must stay in the same directory.".into());
+    }
+    fs::rename(old, new).map_err(|e| format!("Could not rename without replacing an existing path: {e}"))
+}
+
+#[cfg(test)]
+mod file_operation_tests {
+    use super::*;
+
+    #[test]
+    fn create_file_refuses_to_overwrite_and_does_not_create_parents() {
+        let temp = tempfile::tempdir().unwrap();
+        let existing = temp.path().join("existing.txt");
+        fs::write(&existing, "keep me").unwrap();
+        assert!(create_file(existing.to_string_lossy().into_owned()).is_err());
+        assert_eq!(fs::read_to_string(existing).unwrap(), "keep me");
+
+        let nested = temp.path().join("missing").join("new.txt");
+        assert!(create_file(nested.to_string_lossy().into_owned()).is_err());
+        assert!(!nested.parent().unwrap().exists());
+    }
+
+    #[test]
+    fn create_directory_refuses_existing_paths() {
+        let temp = tempfile::tempdir().unwrap();
+        assert!(create_dir(temp.path().to_string_lossy().into_owned()).is_err());
+        assert!(create_dir(temp.path().join("child").to_string_lossy().into_owned()).is_ok());
+    }
+
+    #[test]
+    fn save_replaces_file_and_rejects_symlinks() {
+        let temp = tempfile::tempdir().unwrap();
+        let file = temp.path().join("document.txt");
+        fs::write(&file, "old contents").unwrap();
+        write_file(file.to_string_lossy().into_owned(), "new contents".into()).unwrap();
+        assert_eq!(fs::read_to_string(&file).unwrap(), "new contents");
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::symlink;
+            let target = temp.path().join("outside.txt");
+            let link = temp.path().join("link.txt");
+            fs::write(&target, "untouched").unwrap();
+            symlink(&target, &link).unwrap();
+            assert!(write_file(link.to_string_lossy().into_owned(), "bad overwrite".into()).is_err());
+            assert_eq!(fs::read_to_string(target).unwrap(), "untouched");
+        }
+    }
+
+    #[test]
+    fn delete_removes_symlink_not_its_target_and_rejects_root() {
+        let temp = tempfile::tempdir().unwrap();
+        let target = temp.path().join("target");
+        fs::create_dir(&target).unwrap();
+        fs::write(target.join("keep.txt"), "safe").unwrap();
+        assert!(delete_path(std::path::MAIN_SEPARATOR.to_string()).is_err());
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::symlink;
+            let link = temp.path().join("link");
+            symlink(&target, &link).unwrap();
+            delete_path(link.to_string_lossy().into_owned()).unwrap();
+            assert!(target.join("keep.txt").exists());
+        }
+    }
+
+    #[test]
+    fn rename_refuses_existing_destination_and_cross_directory_moves() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("source.txt");
+        let destination = temp.path().join("destination.txt");
+        fs::write(&source, "source").unwrap();
+        fs::write(&destination, "destination").unwrap();
+        assert!(rename_path(source.to_string_lossy().into_owned(), destination.to_string_lossy().into_owned()).is_err());
+        assert_eq!(fs::read_to_string(&source).unwrap(), "source");
+        assert_eq!(fs::read_to_string(&destination).unwrap(), "destination");
+
+        let other = temp.path().join("other");
+        fs::create_dir(&other).unwrap();
+        assert!(rename_path(source.to_string_lossy().into_owned(), other.join("moved.txt").to_string_lossy().into_owned()).is_err());
+    }
 }
 
 #[tauri::command]

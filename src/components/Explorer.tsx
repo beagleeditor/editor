@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { fsAPI, FileNode } from "../lib/fs";
 import { Icon } from "@iconify/react";
 import { listen } from "@tauri-apps/api/event";
@@ -11,9 +11,7 @@ type Props = {
   tree: FileNode | null;
   onOpenFile: (path: string) => Promise<void>;
   onReload: () => Promise<void>;
-  onNewFile: (path: string) => void;
-  onNewFolder: (path: string) => void;
-  showCreateDialog: (type: "file" | "folder", parentPath?: string) => void;
+  onCreateItem: (type: "file" | "folder", parentPath: string, name: string) => Promise<string | null>;
   onOpenFolder: () => void;
   onCloseFolder: () => void;
   onRename?: (path: string) => void;
@@ -84,9 +82,7 @@ export default function Explorer({
   tree,
   onOpenFile,
   onReload,
-  onNewFile,
-  onNewFolder,
-  showCreateDialog,
+  onCreateItem,
   onOpenFolder,
   onCloseFolder,
   onRename,
@@ -101,6 +97,60 @@ export default function Explorer({
   } | null>(null);
 
   const [refreshKey, setRefreshKey] = useState(0);
+  const [creating, setCreating] = useState<{ type: "file" | "folder"; parentPath: string } | null>(null);
+  const [newItemName, setNewItemName] = useState("");
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [creatingItem, setCreatingItem] = useState(false);
+  const createInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (creating) createInputRef.current?.focus();
+  }, [creating]);
+
+  const beginCreate = (type: "file" | "folder", parentPath: string | undefined) => {
+    if (!parentPath) return;
+    setCreating({ type, parentPath });
+    setNewItemName("");
+    setCreateError(null);
+    setContextMenu(null);
+  };
+
+  const cancelCreate = () => {
+    if (creatingItem) return;
+    setCreating(null);
+    setNewItemName("");
+    setCreateError(null);
+  };
+
+  const submitCreate = async () => {
+    if (!creating || creatingItem) return;
+    const name = newItemName.trim();
+    if (!name) {
+      setCreateError("Enter a name.");
+      return;
+    }
+    if (name === "." || name === ".." || /[\\/]/.test(name)) {
+      setCreateError("Enter a name without path separators.");
+      return;
+    }
+
+    setCreatingItem(true);
+    setCreateError(null);
+    try {
+      const error = await onCreateItem(creating.type, creating.parentPath, name);
+      if (error) {
+        setCreateError(error);
+        createInputRef.current?.select();
+      } else {
+        setCreating(null);
+        setNewItemName("");
+      }
+    } catch (error) {
+      setCreateError(String(error));
+    } finally {
+      setCreatingItem(false);
+    }
+  };
 
   // A successful workspace reload replaces the tree object. Remount the lazy
   // tree nodes so their cached directory listings cannot outlive that snapshot.
@@ -142,7 +192,7 @@ export default function Explorer({
             <button
               className="explorer-action-btn"
               title="New File"
-              onClick={() => showCreateDialog("file", tree?.path)}
+              onClick={() => beginCreate("file", tree?.path)}
             >
               <Icon icon="mdi:file-plus-outline" width="16" />
             </button>
@@ -150,7 +200,7 @@ export default function Explorer({
             <button
               className="explorer-action-btn"
               title="New Folder"
-              onClick={() => showCreateDialog("folder", tree?.path)}
+              onClick={() => beginCreate("folder", tree?.path)}
             >
               <Icon icon="mdi:folder-plus-outline" width="16" />
             </button>
@@ -169,6 +219,40 @@ export default function Explorer({
       </div>
 
       <div className="explorer-content">
+        {creating && (
+          <div className="explorer-create-row">
+            <FileIcon name={newItemName || (creating.type === "file" ? "new-file" : "new-folder")} isDir={creating.type === "folder"} />
+            <div className="explorer-create-field">
+              <input
+                ref={createInputRef}
+                aria-label={creating.type === "file" ? "New file name" : "New folder name"}
+                value={newItemName}
+                disabled={creatingItem}
+                placeholder={creating.type === "file" ? "File name" : "Folder name"}
+                onChange={(event) => {
+                  setNewItemName(event.target.value);
+                  setCreateError(null);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void submitCreate();
+                  } else if (event.key === "Escape") {
+                    event.preventDefault();
+                    cancelCreate();
+                  }
+                }}
+              />
+              {createError && <span className="explorer-create-error" role="alert">{createError}</span>}
+            </div>
+            <button className="explorer-create-confirm" title="Create" aria-label="Create" disabled={creatingItem} onClick={() => void submitCreate()}>
+              <Icon icon="mdi:check" width="15" />
+            </button>
+            <button className="explorer-create-cancel" title="Cancel" aria-label="Cancel" disabled={creatingItem} onClick={cancelCreate}>
+              <Icon icon="mdi:close" width="15" />
+            </button>
+          </div>
+        )}
         {!tree ? (
           <div className="explorer-empty">
             <Icon icon="mdi:folder-open-outline" width="34" />
@@ -204,7 +288,7 @@ export default function Explorer({
               <button
                 className="context-menu-item"
                 onClick={() => {
-                  showCreateDialog("file", contextMenu.path);
+                  beginCreate("file", contextMenu.path);
                   setContextMenu(null);
                 }}
               >
@@ -214,7 +298,7 @@ export default function Explorer({
               <button
                 className="context-menu-item"
                 onClick={() => {
-                  showCreateDialog("folder", contextMenu.path);
+                  beginCreate("folder", contextMenu.path);
                   setContextMenu(null);
                 }}
               >
@@ -233,33 +317,35 @@ export default function Explorer({
             Reveal in Finder
           </button>
 
-          <button
-            className="context-menu-item"
-            onClick={() => {
-              onRename?.(contextMenu.path);
-              setContextMenu(null);
-            }}
-          >
-            Rename
-          </button>
+          {contextMenu.path !== tree?.path && <>
+            <button
+              className="context-menu-item"
+              onClick={() => {
+                onRename?.(contextMenu.path);
+                setContextMenu(null);
+              }}
+            >
+              Rename
+            </button>
 
-          <div
-            style={{
-              height: 1,
-              background: "var(--border)",
-              margin: "4px 0",
-            }}
-          />
+            <div
+              style={{
+                height: 1,
+                background: "var(--border)",
+                margin: "4px 0",
+              }}
+            />
 
-          <button
-            className="context-menu-item"
-            onClick={() => {
-              onDelete?.(contextMenu.path);
-              setContextMenu(null);
-            }}
-          >
-            Delete
-          </button>
+            <button
+              className="context-menu-item"
+              onClick={() => {
+                onDelete?.(contextMenu.path);
+                setContextMenu(null);
+              }}
+            >
+              Delete
+            </button>
+          </>}
         </div>
       )}
     </aside>
@@ -291,18 +377,20 @@ function TreeNode({
   const [open, setOpen] = useState(defaultOpen);
   const [children, setChildren] = useState<FileNode[] | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!defaultOpen || children) return;
 
     (async () => {
       setLoading(true);
+      setLoadError(null);
       try {
         const result = await fsAPI.readDir(node.path);
         setChildren(Array.isArray(result) ? result : []);
       } catch (err) {
         console.error("Failed to read folder:", err);
-        setChildren([]);
+        setLoadError(String(err));
       } finally {
         setLoading(false);
       }
@@ -329,6 +417,7 @@ function TreeNode({
     // LAZY LOAD ON FIRST EXPAND
     if (next && !children) {
       setLoading(true);
+      setLoadError(null);
 
       try {
         const result = await fsAPI.readDir(node.path);
@@ -337,7 +426,7 @@ function TreeNode({
         setChildren(Array.isArray(result) ? result : []);
       } catch (err) {
         console.error("Failed to read folder:", err);
-        setChildren([]);
+        setLoadError(String(err));
       } finally {
         setLoading(false);
       }
@@ -412,6 +501,12 @@ function TreeNode({
           </span>
         )}
       </div>
+
+      {open && loadError && (
+        <div className="file-item" role="alert" title={loadError} style={{ paddingLeft: (depth + 1) * 14, opacity: 0.8 }}>
+          Could not read folder. Collapse and expand to retry.
+        </div>
+      )}
 
       {/* children */}
       {open &&

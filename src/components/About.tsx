@@ -12,7 +12,7 @@ export default function About({ onBack }: { onBack: () => void }) {
       </div>
 
       <div style={{ marginTop: 20, color: "var(--muted)", fontSize: 13 }}>
-        <div>Version: 2026.3.0 "Prism"</div>
+        <div>Version: v26.4.0 "Aurora"</div>
         <div>Built with React + Monaco + Tauri</div>
       </div>
     </div>

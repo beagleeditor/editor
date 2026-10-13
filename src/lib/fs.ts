@@ -24,7 +24,7 @@ export const fsAPI = {
   // Create empty file
   createFile: (path: string): Promise<void> => invoke("create_file", { path }),
 
-  // Create directory (including nested directories)
+  // Create exactly one directory; fail if it already exists or the parent is missing.
   createDir: (path: string): Promise<void> => invoke("create_dir", { path }),
 
   // Check if path exists
@@ -34,7 +34,7 @@ export const fsAPI = {
   readWorkspace: (path: string): Promise<FileNode> =>
     invoke("read_workspace", { path }),
 
-  deletePath: (path: string): Promise<boolean> =>
+  deletePath: (path: string): Promise<void> =>
     invoke("delete_path", { path }),
 
   renamePath: (oldPath: string, newPath: string): Promise<void> =>
