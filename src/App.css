@@ -1908,6 +1908,22 @@ button:focus-visible,
 .extensions-location button { align-self: flex-start; font-size: 11px; padding: 6px 8px; }
 .extensions-location button:disabled { opacity: .45; cursor: default; }
 .extensions-status { padding: 12px 16px 4px; }
+.extensions-install-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 10px 16px 4px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+}
+.extensions-install-button:hover:not(:disabled), .extensions-icon-button:hover:not(:disabled) { background: var(--surface-hover); }
+.extensions-install-button:disabled, .extensions-icon-button:disabled { opacity: .55; cursor: default; }
 
 .extensions-empty {
   display: flex;
@@ -1941,3 +1957,11 @@ button:focus-visible,
 .extension-toggle { flex: 0 0 auto; border: 1px solid var(--border); border-radius: 7px; padding: 6px 8px; background: transparent; color: var(--text); font-size: 10px; cursor: pointer; }
 .extension-toggle.enabled { display: inline-flex; align-items: center; gap: 4px; background: var(--surface-hover); }
 .extensions-footer { margin-top: auto; padding: 14px 16px; border-top: 1px solid var(--border); color: var(--muted); font-size: 10px; line-height: 1.5; }
+
+/* Blue accent only: intentionally leave every existing background token unchanged. */
+.app.theme-dark,
+.app.theme-light,
+.app-shell:has(.app.theme-dark),
+.app-shell:has(.app.theme-light) {
+  --accent: #3b82f6;
+}

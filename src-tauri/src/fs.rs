@@ -55,6 +55,70 @@ pub fn extensions_directory(app: tauri::AppHandle) -> Result<String, String> {
     Ok(path.to_string_lossy().into_owned())
 }
 
+#[tauri::command]
+pub fn install_extension(app: tauri::AppHandle, source: String) -> Result<String, String> {
+    let source = PathBuf::from(source);
+    if !source.is_dir() {
+        return Err("Choose an extension folder.".into());
+    }
+
+    let manifest_path = source.join("manifest.json");
+    let manifest_text = fs::read_to_string(&manifest_path)
+        .map_err(|_| "The selected folder must contain a manifest.json file.".to_string())?;
+    let manifest: ExtensionManifest = serde_json::from_str(&manifest_text)
+        .map_err(|e| format!("Invalid extension manifest: {e}"))?;
+    if manifest.id.trim().is_empty() || manifest.name.trim().is_empty() || manifest.version.trim().is_empty() {
+        return Err("The extension manifest must include a non-empty id, name, and version.".into());
+    }
+    if !manifest.id.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+        || manifest.id == "." || manifest.id == ".."
+    {
+        return Err("Extension id may contain only letters, numbers, dots, hyphens, and underscores.".into());
+    }
+
+    let entry_name = manifest.main.as_deref().unwrap_or("main.js");
+    let entry_path = Path::new(entry_name);
+    if entry_path.components().count() != 1 || entry_path.file_name().and_then(|s| s.to_str()) != Some(entry_name) {
+        return Err("The extension entry point must be a file directly inside the extension folder.".into());
+    }
+    if !source.join(entry_name).is_file() {
+        return Err(format!("The extension entry point '{entry_name}' was not found."));
+    }
+
+    let base = app.path().app_config_dir().map_err(|e| e.to_string())?.join("extensions");
+    fs::create_dir_all(&base).map_err(|e| e.to_string())?;
+    let destination = base.join(&manifest.id);
+    if destination.exists() {
+        return Err(format!("An extension with id '{}' is already installed. Remove it before reinstalling.", manifest.id));
+    }
+
+    copy_extension_tree(&source, &destination)?;
+    Ok(format!("Installed {} v{}.", manifest.name, manifest.version))
+}
+
+fn copy_extension_tree(source: &Path, destination: &Path) -> Result<(), String> {
+    fs::create_dir(destination).map_err(|e| format!("Could not create extension folder: {e}"))?;
+    let result = (|| {
+        for item in fs::read_dir(source).map_err(|e| e.to_string())? {
+            let item = item.map_err(|e| e.to_string())?;
+            let kind = item.file_type().map_err(|e| e.to_string())?;
+            let target = destination.join(item.file_name());
+            if kind.is_dir() {
+                copy_extension_tree(&item.path(), &target)?;
+            } else if kind.is_file() {
+                fs::copy(item.path(), target).map_err(|e| e.to_string())?;
+            } else {
+                return Err("Extensions cannot contain symbolic links or special files.".into());
+            }
+        }
+        Ok(())
+    })();
+    if result.is_err() {
+        let _ = fs::remove_dir_all(destination);
+    }
+    result
+}
+
 /// -----------------------------------------------------
 /// FILE NODE (shared with frontend)
 /// -----------------------------------------------------

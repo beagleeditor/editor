@@ -1,4 +1,4 @@
-import { Check, ExternalLink, Puzzle, RefreshCw } from "lucide-react";
+import { Check, ExternalLink, FolderPlus, Puzzle, RefreshCw } from "lucide-react";
 
 type Extension = {
   manifest: { id: string; name: string; version: string; description?: string };
@@ -12,14 +12,17 @@ type Props = {
   enabled: Record<string, boolean>;
   onToggle: (id: string, enabled: boolean) => void;
   onReload: () => void;
+  onInstall: () => void;
+  installing: boolean;
   onOpenDirectory: () => void;
 };
 
-export default function ExtensionsView({ extensions, status, directory, enabled, onToggle, onReload, onOpenDirectory }: Props) {
+export default function ExtensionsView({ extensions, status, directory, enabled, onToggle, onReload, onInstall, installing, onOpenDirectory }: Props) {
   return (
     <section className="extensions-view">
       <header className="extensions-header">
         <div><div className="search-title">EXTENSIONS</div><p>Extend BeagleEditor with local plugins.</p></div>
+        <button className="extensions-icon-button" onClick={onInstall} disabled={installing} title="Install from folder" aria-label="Install extension from folder"><FolderPlus size={15} /></button>
         <button className="extensions-icon-button" onClick={onReload} title="Reload extensions" aria-label="Reload extensions"><RefreshCw size={15} /></button>
       </header>
       <div className="extensions-location">
@@ -28,6 +31,7 @@ export default function ExtensionsView({ extensions, status, directory, enabled,
         <button onClick={onOpenDirectory} disabled={!directory}><ExternalLink size={13} /> Open folder</button>
       </div>
       <div className="extensions-status">{status}</div>
+      <button className="extensions-install-button" onClick={onInstall} disabled={installing}><FolderPlus size={15} /> {installing ? "Installing…" : "Install from Folder"}</button>
       {extensions.length === 0 ? (
         <div className="extensions-empty">
           <Puzzle size={27} strokeWidth={1.5} />

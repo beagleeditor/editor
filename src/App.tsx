@@ -445,6 +445,7 @@ export default function App() {
   const [extensionCommands, setExtensionCommands] = useState<ExtensionCommand[]>([]);
   const [extensionStatus, setExtensionStatus] = useState("Loading extensions…");
   const [extensionsDirectory, setExtensionsDirectory] = useState("");
+  const [installingExtension, setInstallingExtension] = useState(false);
   const [enabledExtensions, setEnabledExtensions] = useState<Record<string, boolean>>(() => {
     try { return JSON.parse(localStorage.getItem("beagle-enabled-extensions") ?? "{}"); }
     catch { return {}; }
@@ -1365,6 +1366,23 @@ export default function App() {
                     enabled={enabledExtensions}
                     onToggle={(id, enabled) => setEnabledExtensions((current) => ({ ...current, [id]: enabled }))}
                     onReload={() => void reloadExtensions()}
+                    installing={installingExtension}
+                    onInstall={async () => {
+                      if (installingExtension) return;
+                      const selected = await open({ directory: true, multiple: false, title: "Select an extension folder" });
+                      if (typeof selected !== "string") return;
+                      setInstallingExtension(true);
+                      setExtensionStatus("Installing extension…");
+                      try {
+                        const message = await invoke<string>("install_extension", { source: selected });
+                        await reloadExtensions();
+                        setExtensionStatus(message);
+                      } catch (error) {
+                        setExtensionStatus(`Installation failed: ${String(error)}`);
+                      } finally {
+                        setInstallingExtension(false);
+                      }
+                    }}
                     onOpenDirectory={() => void invoke("reveal_in_finder", { path: extensionsDirectory }).catch((error) => setExtensionStatus(`Could not open extension folder: ${String(error)}`))}
                   />
                 )}

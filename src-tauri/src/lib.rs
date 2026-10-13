@@ -86,6 +86,7 @@ pub fn run() {
             read_dir,
             fs::list_extensions,
             fs::extensions_directory,
+            fs::install_extension,
             read_file,
             write_file,
             read_workspace,
