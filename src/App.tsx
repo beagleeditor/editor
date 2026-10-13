@@ -594,6 +594,18 @@ export default function App() {
 
   const [workspaceDir, setWorkspaceDir] = useState<string | null>(null);
   const [fileTree, setFileTree] = useState<FileNode | null>(null);
+  const [recentFolders, setRecentFolders] = useState<string[]>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("beagle-recent-folders") ?? "[]");
+      return Array.isArray(saved) ? saved.filter((path): path is string => typeof path === "string").slice(0, 8) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem("beagle-recent-folders", JSON.stringify(recentFolders));
+  }, [recentFolders]);
 
   /* ---------------- TABS ---------------- */
 
@@ -791,6 +803,38 @@ export default function App() {
     });
   }, [workspaceDir]);
 
+  useEffect(() => {
+    if (booting || !workspaceDir) {
+      if (!workspaceDir) setFileTree(null);
+      return;
+    }
+
+    let cancelled = false;
+    void fsAPI.readDir(workspaceDir).then((entries) => {
+      if (cancelled) return;
+      setFileTree({
+        name: workspaceDir.split(/[/\\]/).pop() ?? "root",
+        path: workspaceDir,
+        is_dir: true,
+        children: entries,
+      });
+    }).catch((error) => {
+      console.error("Could not restore workspace:", error);
+      if (!cancelled) {
+        setWorkspaceDir(null);
+        setFileTree(null);
+      }
+    });
+
+    return () => { cancelled = true; };
+  }, [workspaceDir, booting]);
+
+  const openRecentFolder = (dir: string) => {
+    setWorkspaceDir(dir);
+    setRecentFolders((previous) => [dir, ...previous.filter((path) => path !== dir)].slice(0, 8));
+    setShowWelcome(false);
+  };
+
   const openFolder = async () => {
     if (openFolderLock.current) return;
 
@@ -802,6 +846,7 @@ export default function App() {
       if (!dir || Array.isArray(dir)) return;
 
       setWorkspaceDir(dir);
+      setRecentFolders((previous) => [dir, ...previous.filter((path) => path !== dir)].slice(0, 8));
       setShowWelcome(false);
 
       const entries = await fsAPI.readDir(dir);
@@ -1362,6 +1407,7 @@ export default function App() {
                 {sidebarView === "files" && (
                   <Explorer
                     tree={fileTree}
+                    onOpenFolder={openFolder}
                     onOpenFile={openFileFromExplorer}
                     onReload={reloadWorkspace}
                     // Keep compatibility with Explorer prop types
@@ -1538,6 +1584,8 @@ export default function App() {
                 onOpen={openFile}
                 onNewFile={newFile}
                 onOpenFolder={openFolder}
+                recentFolders={recentFolders}
+                onOpenRecentFolder={openRecentFolder}
               />
             ) : isMarkdown && previewMode !== "edit" ? (
               <div

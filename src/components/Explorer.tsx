@@ -14,6 +14,7 @@ type Props = {
   onNewFile: (path: string) => void;
   onNewFolder: (path: string) => void;
   showCreateDialog: (type: "file" | "folder") => void;
+  onOpenFolder: () => void;
   onRename?: (path: string) => void;
   onDelete?: (path: string) => void;
   onRevealInFinder?: (path: string) => void;
@@ -85,6 +86,7 @@ export default function Explorer({
   onNewFile,
   onNewFolder,
   showCreateDialog,
+  onOpenFolder,
   onRename,
   onDelete,
   onRevealInFinder,
@@ -121,53 +123,44 @@ export default function Explorer({
         <span>EXPLORER</span>
 
         <div className="explorer-actions">
-          <button
-            className="explorer-action-btn"
-            title="New File"
-            onClick={() => {
-              console.log("New File clicked");
-              showCreateDialog("file");
-            }}
-          >
-            <Icon
-              icon="mdi:file-plus-outline"
-              width="16"
-              style={{ color: "#fff" }}
-            />
-          </button>
+          {tree && <>
+            <button
+              className="explorer-action-btn"
+              title="New File"
+              onClick={() => showCreateDialog("file")}
+            >
+              <Icon icon="mdi:file-plus-outline" width="16" />
+            </button>
 
-          <button
-            className="explorer-action-btn"
-            title="New Folder"
-            onClick={() => {
-              console.log("New Folder clicked");
-              showCreateDialog("folder");
-            }}
-          >
-            <Icon
-              icon="mdi:folder-plus-outline"
-              width="16"
-              style={{ color: "#fff" }}
-            />
-          </button>
+            <button
+              className="explorer-action-btn"
+              title="New Folder"
+              onClick={() => showCreateDialog("folder")}
+            >
+              <Icon icon="mdi:folder-plus-outline" width="16" />
+            </button>
 
-          <button
+            <button
             className="explorer-action-btn"
             title="Reload"
             onClick={async () => {
               await onReload?.();
               setRefreshKey((v) => v + 1);
             }}
-          >
-            <Icon icon="mdi:refresh" width="16" style={{ color: "#fff" }} />
-          </button>
+            >
+              <Icon icon="mdi:refresh" width="16" />
+            </button>
+          </>}
         </div>
       </div>
 
       <div className="explorer-content">
         {!tree ? (
-          <div style={{ color: "var(--muted)", fontSize: 13 }}>
-            No folder opened
+          <div className="explorer-empty">
+            <Icon icon="mdi:folder-open-outline" width="34" />
+            <strong>No folder open</strong>
+            <span>Open a project folder to browse files and manage your workspace.</span>
+            <button onClick={onOpenFolder}>Open Folder</button>
           </div>
         ) : (
           <TreeNode

@@ -1268,12 +1268,81 @@ body {
   gap: 4px;
 }
 
+.explorer-empty {
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 20px 8px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.explorer-empty strong { color: var(--text); font-size: 13px; }
+.explorer-empty span { max-width: 210px; font-size: 12px; line-height: 1.6; }
+.explorer-empty button {
+  margin-top: 4px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-hover);
+  color: var(--text);
+  cursor: pointer;
+}
+
 .explorer-action-btn {
   border: none;
   background: transparent;
   cursor: pointer;
   padding: 4px;
 }
+
+/* Welcome screen */
+.welcome-layout {
+  width: min(760px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 44px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 38px;
+}
+.welcome-hero { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.welcome-mark {
+  width: 48px; height: 48px; display: grid; place-items: center;
+  background: var(--surface-hover); border: 1px solid var(--border); color: var(--accent);
+}
+.welcome-eyebrow { margin: 8px 0 0; color: var(--muted); font-size: 11px; letter-spacing: .14em; font-weight: 700; }
+.welcome-hero h1 { font-size: clamp(32px, 5vw, 46px); letter-spacing: -.04em; }
+.welcome-subtitle { margin: 0; color: var(--muted); font-size: 15px; }
+.welcome .welcome-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 0; }
+.welcome .welcome-actions button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  margin: 0; padding: 10px 13px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text); border-radius: 0;
+}
+.welcome .welcome-actions .welcome-primary { background: var(--accent); color: white; border-color: var(--accent); }
+.welcome-section { border-top: 1px solid var(--border); padding-top: 18px; }
+.welcome-section h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 13px; font-weight: 650; }
+.welcome-muted { color: var(--muted); font-size: 13px; }
+.welcome-recent-list { display: flex; flex-direction: column; gap: 2px; }
+.welcome .welcome-recent-item {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0;
+  margin: 0; padding: 10px 8px; background: transparent; color: var(--text);
+  border: 1px solid transparent; text-align: left; font-weight: 400;
+}
+.welcome .welcome-recent-item:hover { background: var(--surface); border-color: var(--border); }
+.welcome-recent-item > svg:first-child { flex: 0 0 auto; color: var(--muted); }
+.welcome-recent-item > span { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.welcome-recent-item strong { font-size: 13px; font-weight: 600; }
+.welcome-recent-item small { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.welcome-tips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; border-top: 1px solid var(--border); padding-top: 20px; }
+.welcome-tips > div { display: flex; align-items: flex-start; gap: 10px; color: var(--muted); }
+.welcome-tips > div > svg { flex: 0 0 auto; margin-top: 2px; }
+.welcome-tips span { display: flex; flex-direction: column; gap: 5px; }
+.welcome-tips strong { color: var(--text); font-size: 12px; }
+.welcome-tips small { font-size: 11px; line-height: 1.5; }
+@media (max-width: 700px) { .welcome-tips { grid-template-columns: 1fr; } .welcome-layout { padding: 24px 0; gap: 28px; } }
 
 .context-menu {
   min-width: 180px;
