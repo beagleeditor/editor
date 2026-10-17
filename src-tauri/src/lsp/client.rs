@@ -312,6 +312,16 @@ impl LspClient {
 
                         "definition": {},
 
+                        "codeAction": {
+                            "dynamicRegistration": false,
+                            "codeActionLiteralSupport": {
+                                "codeActionKind": {
+                                    "valueSet": ["", "quickfix", "refactor", "refactor.extract", "refactor.inline", "refactor.rewrite", "source", "source.organizeImports"]
+                                }
+                            },
+                            "resolveSupport": { "properties": ["edit", "command"] }
+                        },
+
                         "signatureHelp": {
                             "dynamicRegistration": false,
 
@@ -553,6 +563,31 @@ impl LspClient {
                     "line": line,
                     "character": character
                 }
+            }
+        }))
+    }
+
+    pub fn code_actions(
+        &mut self,
+        path: &str,
+        start_line: u32,
+        start_character: u32,
+        end_line: u32,
+        end_character: u32,
+        diagnostics: Value,
+    ) -> Result<Value> {
+        let id = self.request_id();
+        self.send_request(json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "method": "textDocument/codeAction",
+            "params": {
+                "textDocument": { "uri": Self::file_uri(path) },
+                "range": {
+                    "start": { "line": start_line, "character": start_character },
+                    "end": { "line": end_line, "character": end_character }
+                },
+                "context": { "diagnostics": diagnostics, "triggerKind": 1 }
             }
         }))
     }

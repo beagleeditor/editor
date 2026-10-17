@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import type * as Monaco from "monaco-editor";
 import { registerProviders } from "./lsp";
 
 function registerHoverProvider(
@@ -87,6 +88,73 @@ function registerDefinitionProvider(
   });
 }
 
+function registerCodeActionProvider(monaco: typeof import("monaco-editor"), language: string) {
+  monaco.languages.registerCodeActionProvider(language, {
+    async provideCodeActions(model, range, context) {
+      try {
+        const diagnostics = context.markers.map((marker) => ({
+          range: {
+            start: { line: marker.startLineNumber - 1, character: marker.startColumn - 1 },
+            end: { line: marker.endLineNumber - 1, character: marker.endColumn - 1 },
+          },
+          message: marker.message,
+          severity: marker.severity === monaco.MarkerSeverity.Error ? 1 : marker.severity === monaco.MarkerSeverity.Warning ? 2 : marker.severity === monaco.MarkerSeverity.Info ? 3 : 4,
+          source: marker.source,
+          code: typeof marker.code === "string" ? marker.code : marker.code?.value,
+        }));
+        const response = await invoke<any>("lsp_code_actions", {
+          path: model.uri.fsPath,
+          startLine: range.startLineNumber - 1,
+          startCharacter: range.startColumn - 1,
+          endLine: range.endLineNumber - 1,
+          endCharacter: range.endColumn - 1,
+          diagnostics,
+        });
+        const actions = Array.isArray(response?.result) ? response.result : [];
+        const edits: Monaco.languages.CodeAction[] = actions.map((action: any) => {
+          const workspaceEdits: Monaco.languages.IWorkspaceTextEdit[] = [];
+          for (const [uri, textEdits] of Object.entries<any[]>(action.edit?.changes ?? {})) {
+            for (const edit of textEdits) workspaceEdits.push({
+              resource: monaco.Uri.parse(uri),
+              textEdit: { range: toMonacoRange(edit.range), text: edit.newText },
+              versionId: undefined,
+            });
+          }
+          for (const change of action.edit?.documentChanges ?? []) {
+            if (!change.textDocument || !Array.isArray(change.edits)) continue;
+            for (const edit of change.edits) workspaceEdits.push({
+              resource: monaco.Uri.parse(change.textDocument.uri),
+              textEdit: { range: toMonacoRange(edit.range), text: edit.newText },
+              versionId: change.textDocument.version ?? undefined,
+            });
+          }
+          return {
+            title: action.title,
+            kind: action.kind,
+            isPreferred: action.isPreferred,
+            diagnostics: context.markers,
+            edit: workspaceEdits.length ? { edits: workspaceEdits } : undefined,
+            command: action.command ? { id: action.command.command, title: action.command.title, arguments: action.command.arguments } : undefined,
+          };
+        }).filter((action) => action.edit || action.command);
+        return { actions: edits, dispose() {} };
+      } catch (error) {
+        console.error("LSP code actions failed:", error);
+        return { actions: [], dispose() {} };
+      }
+    },
+  });
+}
+
+function toMonacoRange(range: any): Monaco.IRange {
+  return {
+    startLineNumber: range.start.line + 1,
+    startColumn: range.start.character + 1,
+    endLineNumber: range.end.line + 1,
+    endColumn: range.end.character + 1,
+  };
+}
+
 function registerSignatureHelpProvider(
   monaco: typeof import("monaco-editor"),
   language: string,
@@ -138,5 +206,6 @@ export function ensureLanguageProviders(monacoInstance: typeof import("monaco-ed
   registerProviders(monacoInstance, language);
   registerHoverProvider(monacoInstance, language);
   registerDefinitionProvider(monacoInstance, language);
+  registerCodeActionProvider(monacoInstance, language);
   registerSignatureHelpProvider(monacoInstance, language);
 }

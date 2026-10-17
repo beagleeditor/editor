@@ -354,6 +354,36 @@ pub fn lsp_definition(path: String, line: u32, character: u32) -> Result<Value, 
 }
 
 #[tauri::command]
+pub fn lsp_code_actions(
+    path: String,
+    start_line: u32,
+    start_character: u32,
+    end_line: u32,
+    end_character: u32,
+    diagnostics: Value,
+) -> Result<Value, String> {
+    let client_ptr: *mut LspClient = {
+        let mut manager = LSP_MANAGER.lock().unwrap();
+        match manager.client_for_path_mut(&path) {
+            Some(client) => client as *mut LspClient,
+            None => return Err("No LSP client for file".into()),
+        }
+    };
+    unsafe {
+        (&mut *client_ptr)
+            .code_actions(
+                &path,
+                start_line,
+                start_character,
+                end_line,
+                end_character,
+                diagnostics,
+            )
+            .map_err(|error| error.to_string())
+    }
+}
+
+#[tauri::command]
 pub fn lsp_signature_help(path: String, line: u32, character: u32) -> Result<Value, String> {
     let client_ptr: *mut LspClient = {
         let mut manager = LSP_MANAGER.lock().unwrap();
