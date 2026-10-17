@@ -14,8 +14,8 @@ use fs::{
     rename_path, reveal_in_finder, start_watch, write_file,
 };
 use lsp::{
-    lsp_change, lsp_completion, lsp_definition, lsp_format, lsp_hover, lsp_is_initialized,
-    lsp_open, lsp_save, lsp_signature_help, lsp_start, lsp_stop,
+    lsp_change, lsp_code_actions, lsp_completion, lsp_definition, lsp_format, lsp_hover,
+    lsp_is_initialized, lsp_open, lsp_save, lsp_signature_help, lsp_start, lsp_stop,
 };
 use search::search_workspace;
 
@@ -95,6 +95,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .invoke_handler(tauri::generate_handler![
             git::git_status,
+            git::git_diff,
             git::git_init,
             git::git_stage,
             git::git_unstage,
@@ -131,6 +132,7 @@ pub fn run() {
             lsp_is_initialized,
             lsp_hover,
             lsp_definition,
+            lsp_code_actions,
             lsp_signature_help,
         ])
         .run(tauri::generate_context!())

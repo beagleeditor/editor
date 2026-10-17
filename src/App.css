@@ -2336,6 +2336,15 @@ button:focus-visible,
 .terminal-input-row > button:disabled { opacity: .4; cursor: default; }
 .terminal-error { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 5px 12px; color: #f87171; font-size: 11px; }
 .terminal-error button { display: flex; border: 0; background: transparent; color: inherit; cursor: pointer; }
+.sc-change-open { flex: 1; min-width: 0; overflow: hidden; padding: 4px 0; border: 0; background: transparent; color: var(--text); font: inherit; text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.sc-change-open:hover { color: var(--accent); }
+.git-diff-overlay { position: fixed; z-index: 1000; inset: 0; display: flex; align-items: center; justify-content: center; padding: 5vh 5vw; background: rgb(0 0 0 / 62%); }
+.git-diff-dialog { display: flex; width: min(1400px, 100%); height: min(850px, 100%); min-height: 0; flex-direction: column; overflow: hidden; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); box-shadow: 0 24px 90px rgb(0 0 0 / 35%); }
+.git-diff-dialog > header { display: flex; flex: 0 0 44px; align-items: center; justify-content: space-between; gap: 12px; padding: 0 14px; border-bottom: 1px solid var(--border); background: var(--surface); color: var(--text); }
+.git-diff-dialog > header > div { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.git-diff-dialog > header strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.git-diff-dialog > header span { color: var(--muted); font-size: 10px; }
+.git-diff-dialog > .monaco-diff-editor { flex: 1; min-height: 0; }
 
 /* Blue accent only: intentionally leave every existing background token unchanged. */
 .app.theme-dark,

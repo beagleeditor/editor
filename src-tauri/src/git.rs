@@ -1,5 +1,6 @@
 use serde::Serialize;
-use std::path::Path;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 #[derive(Serialize)]
@@ -19,6 +20,15 @@ pub struct GitStatus {
     pub changes: Vec<GitChange>,
     pub ahead: u32,
     pub behind: u32,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitDiff {
+    pub original: String,
+    pub modified: String,
+    pub path: String,
+    pub staged: bool,
 }
 
 fn run_git(root: &str, args: &[&str]) -> Result<String, String> {
@@ -43,6 +53,70 @@ fn validate_root(root: &str) -> Result<(), String> {
         return Err("The workspace folder no longer exists.".into());
     }
     Ok(())
+}
+
+#[tauri::command]
+pub fn git_diff(root: String, path: String, staged: bool) -> Result<GitDiff, String> {
+    validate_root(&root)?;
+    let relative = Path::new(&path);
+    if relative.is_absolute()
+        || relative.components().any(|part| {
+            matches!(
+                part,
+                std::path::Component::ParentDir
+                    | std::path::Component::RootDir
+                    | std::path::Component::Prefix(_)
+            )
+        })
+    {
+        return Err("The file path must stay inside the workspace.".into());
+    }
+    let absolute = PathBuf::from(&root).join(relative);
+    let canonical_root = Path::new(&root)
+        .canonicalize()
+        .map_err(|error| format!("Could not resolve workspace: {error}"))?;
+    if absolute.exists() {
+        let canonical_file = absolute
+            .canonicalize()
+            .map_err(|error| format!("Could not resolve {path}: {error}"))?;
+        if !canonical_file.starts_with(&canonical_root) {
+            return Err("The file path must stay inside the workspace.".into());
+        }
+    }
+    let modified = if absolute.is_file() {
+        fs::read_to_string(&absolute)
+            .map_err(|error| format!("Could not read {}: {error}", path))?
+    } else {
+        String::new()
+    };
+    let show = |spec: &str| -> Result<Option<String>, String> {
+        let output = Command::new("git")
+            .args(["show", spec])
+            .current_dir(&root)
+            .output()
+            .map_err(|error| format!("Could not run Git: {error}"))?;
+        Ok(output
+            .status
+            .success()
+            .then(|| String::from_utf8_lossy(&output.stdout).into_owned()))
+    };
+    let (original, modified) = if staged {
+        (
+            show(&format!("HEAD:{path}"))?.unwrap_or_default(),
+            show(&format!(":{path}"))?.unwrap_or_default(),
+        )
+    } else {
+        let original = show(&format!(":{path}"))?
+            .or(show(&format!("HEAD:{path}"))?)
+            .unwrap_or_default();
+        (original, modified)
+    };
+    Ok(GitDiff {
+        original,
+        modified,
+        path,
+        staged,
+    })
 }
 
 #[tauri::command]

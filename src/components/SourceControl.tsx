@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowDownToLine, ArrowUpFromLine, Check, GitBranch, GitCommit, RefreshCw, RotateCcw, Upload, FolderGit2 } from "lucide-react";
+import { DiffEditor } from "@monaco-editor/react";
+import { ArrowDownToLine, ArrowUpFromLine, Check, GitBranch, GitCommit, RefreshCw, RotateCcw, FolderGit2, X } from "lucide-react";
 
 type Change = { path: string; status: string; staged: boolean; unstaged: boolean; untracked: boolean };
 type Status = { branch: string; changes: Change[]; ahead: number; behind: number };
+type Diff = { original: string; modified: string; path: string; staged: boolean };
 
 export default function SourceControl({ root }: { root: string | null }) {
   const [status, setStatus] = useState<Status | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [diff, setDiff] = useState<Diff | null>(null);
+  const [diffLoading, setDiffLoading] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!root) { setStatus(null); return; }
@@ -41,6 +45,15 @@ export default function SourceControl({ root }: { root: string | null }) {
     }
   };
 
+  const openDiff = async (path: string, staged: boolean) => {
+    if (!root) return;
+    setDiffLoading(true);
+    setError("");
+    try { setDiff(await invoke<Diff>("git_diff", { root, path, staged })); }
+    catch (reason) { setError(`Could not open diff: ${String(reason)}`); }
+    finally { setDiffLoading(false); }
+  };
+
   if (!root) return <div className="sc-panel"><div className="sc-title">SOURCE CONTROL</div><div className="sc-empty"><FolderGit2 size={28} /><strong>No folder open</strong><span>Open a workspace to use Git.</span></div></div>;
 
   if (error.includes("not a git repository") || error.includes("not a git repository".toUpperCase())) {
@@ -63,10 +76,10 @@ export default function SourceControl({ root }: { root: string | null }) {
           </form>
 
           <div className="sc-section-title"><span>Changes</span><span>{unstaged.length}</span></div>
-          {unstaged.length ? unstaged.map((change) => <div className="sc-change" key={change.path} title={change.path}><span className={`sc-status-code ${change.untracked ? "new" : ""}`}>{change.untracked ? "U" : change.status.slice(-1) || "M"}</span><span className="sc-change-path">{change.path}</span><button title="Stage change" disabled={busy} onClick={() => void runAction(() => invoke("git_stage", { root, path: change.path }))}><Check size={14} /></button></div>) : <p className="sc-muted">No unstaged changes.</p>}
+          {unstaged.length ? unstaged.map((change) => <div className="sc-change" key={change.path} title={change.path}><span className={`sc-status-code ${change.untracked ? "new" : ""}`}>{change.untracked ? "U" : change.status.slice(-1) || "M"}</span><button className="sc-change-open" onClick={() => void openDiff(change.path, false)}>{change.path}</button><button title="Stage change" disabled={busy} onClick={() => void runAction(() => invoke("git_stage", { root, path: change.path }))}><Check size={14} /></button></div>) : <p className="sc-muted">No unstaged changes.</p>}
 
           <div className="sc-section-title"><span>Staged Changes</span><span>{staged.length}</span></div>
-          {staged.length ? staged.map((change) => <div className="sc-change" key={change.path} title={change.path}><span className="sc-status-code staged">{change.status[0] || "A"}</span><span className="sc-change-path">{change.path}</span><button title="Unstage change" disabled={busy} onClick={() => void runAction(() => invoke("git_unstage", { root, path: change.path }))}><RotateCcw size={14} /></button></div>) : <p className="sc-muted">No staged changes.</p>}
+          {staged.length ? staged.map((change) => <div className="sc-change" key={change.path} title={change.path}><span className="sc-status-code staged">{change.status[0] || "A"}</span><button className="sc-change-open" onClick={() => void openDiff(change.path, true)}>{change.path}</button><button title="Unstage change" disabled={busy} onClick={() => void runAction(() => invoke("git_unstage", { root, path: change.path }))}><RotateCcw size={14} /></button></div>) : <p className="sc-muted">No staged changes.</p>}
 
           <div className="sc-remote-actions">
             <button disabled={busy} onClick={() => void runAction(() => invoke("git_pull", { root }))}><ArrowDownToLine size={14} /> Pull</button>
@@ -76,6 +89,19 @@ export default function SourceControl({ root }: { root: string | null }) {
           {status.behind > 0 && <p className="sc-muted">{status.behind} commit(s) behind remote.</p>}
         </>}
       </div>
+      {diffLoading && <div className="sc-muted">Loading diff…</div>}
+      {diff && <div className="git-diff-overlay" role="dialog" aria-modal="true" aria-label={`Diff for ${diff.path}`}>
+        <section className="git-diff-dialog">
+          <header><div><strong>{diff.path}</strong><span>{diff.staged ? "Staged changes" : "Working tree changes"}</span></div><button className="panel-icon-button" onClick={() => setDiff(null)} aria-label="Close diff"><X size={16} /></button></header>
+          <DiffEditor height="100%" original={diff.original} modified={diff.modified} language={languageForPath(diff.path)} theme="vs-dark" options={{ readOnly: true, renderSideBySide: true, automaticLayout: true, minimap: { enabled: false }, scrollBeyondLastLine: false, originalEditable: false }} />
+        </section>
+      </div>}
     </div>
   );
+}
+
+function languageForPath(path: string): string {
+  const extension = path.split(".").pop()?.toLowerCase();
+  const languages: Record<string, string> = { ts: "typescript", tsx: "typescript", js: "javascript", jsx: "javascript", py: "python", rs: "rust", go: "go", json: "json", md: "markdown", css: "css", html: "html", toml: "toml", yaml: "yaml", yml: "yaml", sh: "shell", c: "c", h: "c", cpp: "cpp", java: "java" };
+  return languages[extension ?? ""] ?? "plaintext";
 }
