@@ -13,7 +13,7 @@ The shortcuts below are the primary documented shortcuts. `Cmd` refers to the Co
 | Format Document | `Cmd+Shift+I` | `Ctrl+Shift+I` |
 | Quick Fix | `Cmd+.` | `Ctrl+.` |
 | Show Problems | `Cmd+Shift+M` | `Ctrl+Shift+M` |
-| Toggle Terminal | `Ctrl+`` | `Ctrl+`` |
+| Toggle Terminal | Ctrl + backtick | Ctrl + backtick |
 | Toggle Sidebar | `Cmd+B` | `Ctrl+B` |
 | Open Settings | `Cmd+,` | `Ctrl+,` |
 | Quit BeagleEditor | `Cmd+Q` | `Ctrl+Q` |
