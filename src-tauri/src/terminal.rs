@@ -24,6 +24,14 @@ struct TerminalOutput {
     text: String,
 }
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TerminalSessionInfo {
+    id: u32,
+    shell: String,
+    cwd: String,
+}
+
 fn emit_output(app: &tauri::AppHandle, session_id: u32, stream: &str, text: String) {
     let _ = app.emit(
         "terminal-output",
@@ -36,20 +44,37 @@ fn emit_output(app: &tauri::AppHandle, session_id: u32, stream: &str, text: Stri
 }
 
 #[tauri::command]
-pub fn terminal_start(app: tauri::AppHandle, cwd: Option<String>) -> Result<u32, String> {
+pub fn terminal_start(
+    app: tauri::AppHandle,
+    cwd: Option<String>,
+) -> Result<TerminalSessionInfo, String> {
     let working_dir = cwd
         .filter(|path| std::path::Path::new(path).is_dir())
         .or_else(|| std::env::var("HOME").ok())
         .unwrap_or_else(|| ".".to_string());
 
-    #[cfg(target_os = "macos")]
-    let mut command = {
-        let mut command = Command::new("/bin/zsh");
-        command.arg("-f");
-        command
+    #[cfg(windows)]
+    let (shell, mut command) = {
+        let shell = std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".to_string());
+        let mut command = Command::new(&shell);
+        command.arg("/Q");
+        (shell, command)
     };
-    #[cfg(not(target_os = "macos"))]
-    let mut command = Command::new("/bin/sh");
+    #[cfg(not(windows))]
+    let (shell, mut command) = {
+        let fallback = if cfg!(target_os = "macos") {
+            "/bin/zsh"
+        } else {
+            "/bin/sh"
+        };
+        let configured = std::env::var("SHELL")
+            .ok()
+            .filter(|path| std::path::Path::new(path).is_file());
+        let shell = configured.unwrap_or_else(|| fallback.to_string());
+        let mut command = Command::new(&shell);
+        command.arg("-l");
+        (shell, command)
+    };
 
     let mut child = command
         .current_dir(&working_dir)
@@ -131,7 +156,11 @@ pub fn terminal_start(app: tauri::AppHandle, cwd: Option<String>) -> Result<u32,
         }
     });
 
-    Ok(session_id)
+    Ok(TerminalSessionInfo {
+        id: session_id,
+        shell,
+        cwd: working_dir,
+    })
 }
 
 #[tauri::command]

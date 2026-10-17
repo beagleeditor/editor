@@ -32,7 +32,7 @@ Select a changed filename to open the Monaco diff editor. Unstaged diffs compare
 
 ## Terminal
 
-Open Terminal from the bottom panel or use `Ctrl+``. Create a terminal session to run commands in the workspace directory. Multiple sessions can be open; switch between their tabs, clear the displayed output, stop a running session, or close a session when finished.
+Open Terminal from the bottom panel or use `Ctrl+``. BeagleEditor starts your configured default shell (`$SHELL` on macOS/Linux, or `COMSPEC` on Windows) in the workspace directory. Each submitted command gets its own block with streamed output, exit status, and elapsed time. Multiple sessions can be open; switch between their tabs, clear the displayed output, stop a running session, or close a session when finished. This block-based input is designed for running commands, not full-screen interactive terminal programs that require a real TTY.
 
 The terminal runs a shell process with your user permissions. Commands can modify or delete files and access your environment, so run only commands you understand and trust.
 

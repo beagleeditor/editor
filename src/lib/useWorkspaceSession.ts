@@ -31,8 +31,32 @@ export function useWorkspaceSession({
 }: Options) {
   useEffect(() => {
     if (!hydratedRef.current) return;
-    const session: SessionState = { workspaceDir, tabs, activeTabId, timestamp: Date.now(), version: 1 };
-    localStorage.setItem("beagle-session", JSON.stringify(session));
+    // Serializing every open document and writing it to localStorage is synchronous.
+    // Debounce it so opening a file and typing stay responsive, especially with large tabs.
+    let idleHandle: number | undefined;
+    const timer = window.setTimeout(() => {
+      const persist = () => {
+        const session: SessionState = { workspaceDir, tabs, activeTabId, timestamp: Date.now(), version: 1 };
+        try {
+          localStorage.setItem("beagle-session", JSON.stringify(session));
+        } catch (error) {
+          console.warn("Could not persist BeagleEditor session:", error);
+        }
+      };
+
+      if ("requestIdleCallback" in window) {
+        idleHandle = window.requestIdleCallback(persist, { timeout: 1000 });
+      } else {
+        persist();
+      }
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timer);
+      if (idleHandle !== undefined && "cancelIdleCallback" in window) {
+        window.cancelIdleCallback(idleHandle);
+      }
+    };
   }, [workspaceDir, tabs, activeTabId, hydratedRef]);
 
   useEffect(() => {

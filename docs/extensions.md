@@ -168,6 +168,30 @@ Registers a command in the command palette and returns an unregister callback.
 
 The full command ID is namespaced as `<extension-id>.<command-id>`. For example, `word-counter.count-words`. Use distinct command IDs within your extension. Keep the returned callback and call it during cleanup if you need to unregister a command before the extension is deactivated.
 
+### `api.registerStatusBarItem({ id, text, tooltip?, alignment?, priority?, run? })`
+
+Adds a small item to the BeagleEditor status bar and returns an unregister callback. Items are removed automatically when the extension is deactivated.
+
+- `id`: identifier local to your extension.
+- `text`: short text displayed in the status bar.
+- `tooltip`: optional hover text.
+- `alignment`: `"left"` or `"right"`; defaults to `"left"`.
+- `priority`: optional number; higher-priority items appear first within their side.
+- `run`: optional callback invoked when the item is clicked; it may return a promise.
+
+```js
+export function activate(api) {
+  const item = api.registerStatusBarItem({
+    id: "workspace-greeting",
+    text: "Hello, Beagle",
+    tooltip: "Show an extension message",
+    alignment: "right",
+    run: () => api.showMessage("Your extension is running."),
+  });
+  return () => item();
+}
+```
+
 ### `api.showMessage(message)`
 
 Displays a native web-view alert prefixed with the extension name. The value is converted to a string. Use it for simple messages; it is not a custom notification or status-bar API.
@@ -223,6 +247,27 @@ Moves the cursor to the requested one-based line and column, reveals it in the e
 ### `api.insertTextAtCursor(text)`
 
 Inserts text at the current cursor position and focuses the editor. Returns `true` if inserted or `false` if no active editor position is available. The edit marks the document as modified.
+
+### `api.setEditorDecorations(decorations)`
+
+Adds line decorations to the current editor model and returns a cleanup function. Calling the cleanup removes only the decorations created by that call. Invalid line numbers are ignored; if no editor model is active, the function returns a no-op cleanup callback.
+
+Each decoration accepts `lineNumber` (required), `className`, `glyphMarginClassName`, `hoverMessage`, and `isWholeLine`. Class names are CSS classes, so an extension that supplies custom classes must also provide the corresponding styles. Decorations attach to the model that was active when the API was called.
+
+```js
+export function activate(api) {
+  const decorate = () => {
+    const document = api.getActiveDocument();
+    if (!document) return;
+    return api.setEditorDecorations([
+      { lineNumber: 1, isWholeLine: true, hoverMessage: "Marked by my extension" },
+    ]);
+  };
+
+  const clear = decorate();
+  return () => clear?.();
+}
+```
 
 Example — uppercase selected text:
 
@@ -293,7 +338,7 @@ The current API is intentionally small. It does **not** currently provide:
 
 - VS Code extension compatibility or a package marketplace.
 - A dependency manager or extension installer.
-- Editor decorations, custom editor actions, or custom sidebar panels.
+- Custom editor actions or custom sidebar panels.
 - Fine-grained document change events, range-based edits beyond replacing the current selection, or an editor save-command API.
 - A stable public API guarantee across releases.
 - A sandbox or permission system. Extensions execute in the editor web view and should be treated as trusted code.

@@ -1,5 +1,7 @@
+import { useEffect, useState } from "react";
 import * as monaco from "monaco-editor";
 import { AlertCircle, AlertTriangle, CircleAlert, Terminal } from "lucide-react";
+import type { ExtensionStatusItem } from "../lib/useExtensionRuntime";
 
 type Props = {
   fileName: string | null;
@@ -8,8 +10,7 @@ type Props = {
   encoding: string;
   lineEnding: string;
   onLanguageChange: (language: string) => void;
-  line: number;
-  column: number;
+  editorInstance: any;
   tabSize: number;
   insertSpaces: boolean;
   bottomPanel: "problems" | "terminal" | null;
@@ -17,6 +18,7 @@ type Props = {
   warningCount: number;
   onShowProblems: () => void;
   onShowTerminal: () => void;
+  extensionItems: ExtensionStatusItem[];
 };
 
 export default function StatusBar({
@@ -26,8 +28,7 @@ export default function StatusBar({
   encoding,
   lineEnding,
   onLanguageChange,
-  line,
-  column,
+  editorInstance,
   tabSize,
   insertSpaces,
   bottomPanel,
@@ -35,7 +36,25 @@ export default function StatusBar({
   warningCount,
   onShowProblems,
   onShowTerminal,
+  extensionItems,
 }: Props) {
+  const [position, setPosition] = useState({ line: 1, column: 1 });
+  useEffect(() => {
+    if (!editorInstance) {
+      setPosition({ line: 1, column: 1 });
+      return;
+    }
+    const updatePosition = (position: monaco.Position | null) => {
+      if (!position) return;
+      setPosition((current) => current.line === position.lineNumber && current.column === position.column
+        ? current
+        : { line: position.lineNumber, column: position.column });
+    };
+    updatePosition(editorInstance.getPosition());
+    const listener = editorInstance.onDidChangeCursorPosition((event: { position: monaco.Position }) => updatePosition(event.position));
+    return () => listener.dispose();
+  }, [editorInstance]);
+
   const displayName = fileName?.split(/[\\/]/).pop() ?? null;
   const languages = monaco.languages
     .getLanguages()
@@ -45,6 +64,9 @@ export default function StatusBar({
   return (
     <footer className="status-bar" aria-label="Editor status">
       <div className="status-left">
+        {extensionItems.filter((item) => item.alignment === "left").sort((a, b) => b.priority - a.priority).map((item) => (
+          <button key={item.id} className="status-extension-item" title={item.tooltip ?? item.text} onClick={() => void item.run?.()}>{item.text}</button>
+        ))}
         <button className={`status-panel-button ${bottomPanel === "problems" ? "active" : ""}`} onClick={onShowProblems} title="Toggle Problems" aria-label="Toggle Problems">
           <CircleAlert size={14} />
           <span>Problems</span>
@@ -60,10 +82,13 @@ export default function StatusBar({
         <span className="status-file" title={fileName ?? "No file open"}>
           {displayName ?? "No file open"}{dirty ? " ●" : ""}
         </span>
-        <span>{`Ln ${line}, Col ${column}`}</span>
+        <span>{`Ln ${position.line}, Col ${position.column}`}</span>
       </div>
 
       <div className="status-right">
+        {extensionItems.filter((item) => item.alignment === "right").sort((a, b) => b.priority - a.priority).map((item) => (
+          <button key={item.id} className="status-extension-item" title={item.tooltip ?? item.text} onClick={() => void item.run?.()}>{item.text}</button>
+        ))}
         <span>{insertSpaces ? `Spaces: ${tabSize}` : `Tabs: ${tabSize}`}</span>
         <span>{encoding}</span>
 

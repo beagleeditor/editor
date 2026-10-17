@@ -8,6 +8,7 @@ import type { PaletteCommand } from "../components/CommandPalette";
 type Extension = { manifest: { id: string; name: string; version: string; description?: string; main?: string; type?: string; theme?: string }; entry: string; themeData?: unknown; path: string };
 type Snapshot = { id: string; name: string; path: string | null; language: string; content: string; dirty: boolean } | null;
 type Command = PaletteCommand & { extensionId: string };
+export type ExtensionStatusItem = { id: string; extensionId: string; text: string; tooltip?: string; alignment: "left" | "right"; priority: number; run?: () => void | Promise<void> };
 type Props = {
   extensions: Extension[];
   enabledExtensions: Record<string, boolean>;
@@ -17,6 +18,7 @@ type Props = {
   editorRef: MutableRefObject<any>;
   setTabs: Dispatch<SetStateAction<Tab[]>>;
   setExtensionCommands: Dispatch<SetStateAction<Command[]>>;
+  setExtensionStatusItems: Dispatch<SetStateAction<ExtensionStatusItem[]>>;
   setExtensionStatus: Dispatch<SetStateAction<string>>;
   activeDocumentListeners: MutableRefObject<Set<(document: Snapshot) => void>>;
 };
@@ -25,11 +27,12 @@ function snapshot(tab: Tab | undefined): Snapshot {
   return tab ? { id: tab.id, name: tab.name, path: tab.path, language: tab.language, content: tab.content, dirty: tab.dirty } : null;
 }
 
-export function useExtensionRuntime({ extensions, enabledExtensions, activeTabRef, tabsRef, workspaceDirRef, editorRef, setTabs, setExtensionCommands, setExtensionStatus, activeDocumentListeners }: Props) {
+export function useExtensionRuntime({ extensions, enabledExtensions, activeTabRef, tabsRef, workspaceDirRef, editorRef, setTabs, setExtensionCommands, setExtensionStatusItems, setExtensionStatus, activeDocumentListeners }: Props) {
   useEffect(() => {
     let cancelled = false;
     const disposers = new Map<string, () => void>();
     const commands: Command[] = [];
+    const statusItems: ExtensionStatusItem[] = [];
 
     const activate = async () => {
       for (const extension of extensions) {
@@ -40,6 +43,7 @@ export function useExtensionRuntime({ extensions, enabledExtensions, activeTabRe
           const module = await import(/* @vite-ignore */ moduleUrl) as { activate?: (api: any) => unknown | Promise<unknown> };
           if (cancelled) break;
           const registered = new Map<string, Command>();
+          const registeredStatusItems = new Map<string, ExtensionStatusItem>();
           const result = await module.activate?.({
             extension: extension.manifest,
             registerCommand: (command: { id: string; title: string; run: () => void | Promise<void> }) => {
@@ -55,6 +59,30 @@ export function useExtensionRuntime({ extensions, enabledExtensions, activeTabRe
               };
               registered.set(fullId, item); commands.push(item); setExtensionCommands([...commands]);
               return () => { registered.delete(fullId); const index = commands.findIndex((entry) => entry.id === fullId); if (index !== -1) commands.splice(index, 1); setExtensionCommands([...commands]); };
+            },
+            registerStatusBarItem: (item: { id: string; text: string; tooltip?: string; alignment?: "left" | "right"; priority?: number; run?: () => void | Promise<void> }) => {
+              if (!item || typeof item.id !== "string" || !item.id.trim() || typeof item.text !== "string") return () => {};
+              const fullId = `${id}.${item.id}`;
+              if (registeredStatusItems.has(fullId)) return () => {};
+              const statusItem: ExtensionStatusItem = {
+                id: fullId, extensionId: id, text: item.text,
+                ...(typeof item.tooltip === "string" ? { tooltip: item.tooltip } : {}),
+                alignment: item.alignment === "right" ? "right" : "left",
+                priority: Number.isFinite(item.priority) ? Number(item.priority) : 0,
+                ...(typeof item.run === "function" ? { run: async () => {
+                  try { await item.run?.(); }
+                  catch (error) { console.error(`Extension ${id} status item failed:`, error); setExtensionStatus(`${extension.manifest.name}: status item failed; see developer console`); }
+                } } : {}),
+              };
+              registeredStatusItems.set(fullId, statusItem);
+              statusItems.push(statusItem);
+              setExtensionStatusItems([...statusItems]);
+              return () => {
+                registeredStatusItems.delete(fullId);
+                const index = statusItems.findIndex((entry) => entry.id === fullId);
+                if (index !== -1) statusItems.splice(index, 1);
+                setExtensionStatusItems([...statusItems]);
+              };
             },
             showMessage: (message: unknown) => window.alert(`[${extension.manifest.name}] ${String(message)}`),
             getActiveDocument: () => snapshot(activeTabRef.current),
@@ -90,6 +118,26 @@ export function useExtensionRuntime({ extensions, enabledExtensions, activeTabRe
               const position = editorRef.current?.getPosition?.();
               return position ? { lineNumber: position.lineNumber, column: position.column } : null;
             },
+            setEditorDecorations: (decorations: Array<{ lineNumber: number; className?: string; glyphMarginClassName?: string; hoverMessage?: string; isWholeLine?: boolean }>) => {
+              const model = editorRef.current?.getModel?.();
+              if (!model || !Array.isArray(decorations)) return () => {};
+              const valid = decorations.filter((decoration) => decoration && Number.isInteger(decoration.lineNumber) && decoration.lineNumber >= 1 && decoration.lineNumber <= model.getLineCount()).map((decoration) => ({
+                range: { startLineNumber: decoration.lineNumber, startColumn: 1, endLineNumber: decoration.lineNumber, endColumn: model.getLineMaxColumn(decoration.lineNumber) },
+                options: {
+                  ...(typeof decoration.className === "string" ? { className: decoration.className } : {}),
+                  ...(typeof decoration.glyphMarginClassName === "string" ? { glyphMarginClassName: decoration.glyphMarginClassName } : {}),
+                  ...(typeof decoration.hoverMessage === "string" ? { hoverMessage: { value: decoration.hoverMessage } } : {}),
+                  ...(decoration.isWholeLine ? { isWholeLine: true } : {}),
+                },
+              }));
+              const ids = model.deltaDecorations([], valid);
+              let disposed = false;
+              return () => {
+                if (disposed) return;
+                disposed = true;
+                if (!model.isDisposed()) model.deltaDecorations(ids, []);
+              };
+            },
             setEditorPosition: (lineNumber: number, column: number) => {
               const editor = editorRef.current;
               if (!editor || !Number.isInteger(lineNumber) || !Number.isInteger(column) || lineNumber < 1 || column < 1) return false;
@@ -118,6 +166,11 @@ export function useExtensionRuntime({ extensions, enabledExtensions, activeTabRe
             },
           });
           disposers.set(id, () => {
+            for (const item of registeredStatusItems.values()) {
+              const index = statusItems.findIndex((entry) => entry.id === item.id);
+              if (index !== -1) statusItems.splice(index, 1);
+            }
+            setExtensionStatusItems([...statusItems]);
             if (typeof result === "function") (result as () => void)();
             else if (result && typeof (result as { dispose?: unknown }).dispose === "function") (result as { dispose: () => void }).dispose();
           });
@@ -125,7 +178,7 @@ export function useExtensionRuntime({ extensions, enabledExtensions, activeTabRe
       }
       if (!cancelled) setExtensionCommands([...commands]);
     };
-    setExtensionCommands([]); void activate();
+    setExtensionCommands([]); setExtensionStatusItems([]); void activate();
     return () => { cancelled = true; for (const dispose of disposers.values()) { try { dispose(); } catch (error) { console.error("Extension cleanup failed:", error); } } };
-  }, [extensions, enabledExtensions, activeTabRef, tabsRef, workspaceDirRef, editorRef, setTabs, setExtensionCommands, setExtensionStatus, activeDocumentListeners]);
+  }, [extensions, enabledExtensions, activeTabRef, tabsRef, workspaceDirRef, editorRef, setTabs, setExtensionCommands, setExtensionStatusItems, setExtensionStatus, activeDocumentListeners]);
 }

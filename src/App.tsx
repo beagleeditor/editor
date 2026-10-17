@@ -117,6 +117,7 @@ export default function App() {
 
   const [showAbout, setShowAbout] = useState(false);
   const [extensionCommands, setExtensionCommands] = useState<ExtensionCommand[]>([]);
+  const [extensionStatusItems, setExtensionStatusItems] = useState<Array<{ id: string; extensionId: string; text: string; tooltip?: string; alignment: "left" | "right"; priority: number; run?: () => void | Promise<void> }>>([]);
   const { extensions, extensionStatus, setExtensionStatus, extensionsDirectory, installingExtension,
     setInstallingExtension, enabledExtensions, setEnabledExtensions, reloadExtensions } = useExtensionManager();
   const activeDocumentListeners = useRef(new Set<(document: ReturnType<typeof getDocumentSnapshot>) => void>());
@@ -143,8 +144,6 @@ export default function App() {
   const [commandPaletteVisible, setCommandPaletteVisible] = useState(false);
   const [commandPaletteQuery, setCommandPaletteQuery] = useState("");
   const [quickOpenQuery, setQuickOpenQuery] = useState("");
-  const [line, setLine] = useState(1);
-  const [column, setColumn] = useState(1);
   const [previewMode, setPreviewMode] = useState<"edit" | "preview" | "split">(
     "edit",
   );
@@ -206,6 +205,7 @@ export default function App() {
     editorRef,
     setTabs,
     setExtensionCommands,
+    setExtensionStatusItems,
     setExtensionStatus,
     activeDocumentListeners,
   });
@@ -353,8 +353,8 @@ export default function App() {
             <EditorSurface
               showAbout={showAbout} setShowAbout={setShowAbout} activeTab={activeTab} isMarkdown={isMarkdown}
               previewMode={previewMode} activeModelUri={activeModelUri} editorTheme={editorTheme} settings={settings}
-              editorRef={editorRef} previewRef={previewRef} setEditorInstance={setEditorInstance} setLine={setLine}
-              setColumn={setColumn} syncEditorScroll={syncEditorScroll} syncPreviewScroll={syncPreviewScroll}
+              editorRef={editorRef} previewRef={previewRef} setEditorInstance={setEditorInstance}
+              syncEditorScroll={syncEditorScroll} syncPreviewScroll={syncPreviewScroll}
               addFormatAction={addFormatAction} syncActiveModel={syncActiveModel} updateContent={updateContent}
               openFile={openFile} newFile={newFile} openFolder={openFolder} recentFolders={recentFolders}
               openRecentFolder={openRecentFolder}
@@ -371,8 +371,7 @@ export default function App() {
           lineEnding={activeTab?.content.includes("\r\n") ? "CRLF" : "LF"}
           encoding="UTF-8"
           onLanguageChange={changeLanguage}
-          line={line}
-          column={column}
+          editorInstance={editorInstance}
           tabSize={settings.tabSize}
           insertSpaces={editorInstance
             ? (editorInstance.getModel()?.getOptions().insertSpaces ?? true)
@@ -385,6 +384,7 @@ export default function App() {
             setTerminalPanelCreated(true);
             setBottomPanel((panel) => panel === "terminal" ? null : "terminal");
           }}
+          extensionItems={extensionStatusItems}
         />
       </div>
     </div>

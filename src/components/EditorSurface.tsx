@@ -17,7 +17,7 @@ type Props = {
   activeTab: Tab | undefined; isMarkdown: boolean; previewMode: "edit" | "preview" | "split";
   activeModelUri: string | null; editorTheme: string; settings: Settings;
   editorRef: MutableRefObject<any>; previewRef: MutableRefObject<HTMLDivElement | null>;
-  setEditorInstance: Dispatch<SetStateAction<any>>; setLine: Dispatch<SetStateAction<number>>; setColumn: Dispatch<SetStateAction<number>>;
+  setEditorInstance: Dispatch<SetStateAction<any>>;
   syncEditorScroll: (editor: any) => void; syncPreviewScroll: () => void;
   addFormatAction: (editor: any, monacoInstance: typeof monaco) => void;
   syncActiveModel: () => monaco.editor.ITextModel | null; updateContent: (value?: string) => void;
@@ -27,7 +27,7 @@ type Props = {
 
 export default function EditorSurface(props: Props) {
   const { showAbout, setShowAbout, activeTab, isMarkdown, previewMode, activeModelUri, editorTheme, settings,
-    editorRef, previewRef, setEditorInstance, setLine, setColumn, syncEditorScroll, syncPreviewScroll,
+    editorRef, previewRef, setEditorInstance, syncEditorScroll, syncPreviewScroll,
     addFormatAction, syncActiveModel, updateContent, openFile, newFile, openFolder, recentFolders, openRecentFolder } = props;
   return (
     <>
@@ -75,15 +75,6 @@ export default function EditorSurface(props: Props) {
                               ensureLanguageProviders(monaco, m.getLanguageId());
                               void attachModelSync(m, m.getLanguageId());
                             }
-                          });
-
-                          const pos = editor.getPosition();
-                          setLine(pos?.lineNumber ?? 1);
-                          setColumn(pos?.column ?? 1);
-
-                          editor.onDidChangeCursorPosition((e) => {
-                            setLine(e.position.lineNumber);
-                            setColumn(e.position.column);
                           });
 
                           editor.onDidScrollChange(() => {
@@ -139,15 +130,6 @@ export default function EditorSurface(props: Props) {
                       ensureLanguageProviders(monaco, m.getLanguageId());
                       void attachModelSync(m, m.getLanguageId());
                     }
-                  });
-
-                  const pos = editor.getPosition();
-                  setLine(pos?.lineNumber ?? 1);
-                  setColumn(pos?.column ?? 1);
-
-                  editor.onDidChangeCursorPosition((e) => {
-                    setLine(e.position.lineNumber);
-                    setColumn(e.position.column);
                   });
 
                   const KM = monaco.KeyMod;
