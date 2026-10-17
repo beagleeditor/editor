@@ -2345,6 +2345,27 @@ button:focus-visible,
 .git-diff-dialog > header strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .git-diff-dialog > header span { color: var(--muted); font-size: 10px; }
 .git-diff-dialog > .monaco-diff-editor { flex: 1; min-height: 0; }
+.run-debug-panel { display: flex; height: 100%; min-height: 0; flex-direction: column; overflow: hidden; color: var(--text); }
+.run-debug-config { display: flex; flex-direction: column; gap: 12px; padding: 12px; overflow: auto; }
+.run-debug-config label { display: flex; flex-direction: column; gap: 5px; color: var(--muted); font-size: 11px; }
+.run-debug-config label span { display: inline; color: var(--muted); font-size: 10px; }
+.run-debug-config input, .run-debug-config textarea { width: 100%; min-width: 0; box-sizing: border-box; padding: 7px 8px; border: 1px solid var(--border); border-radius: 5px; outline: 0; background: var(--bg); color: var(--text); font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.run-debug-config input:focus, .run-debug-config textarea:focus { border-color: var(--accent); }
+.run-debug-config textarea { resize: vertical; }
+.run-debug-actions { display: flex; gap: 7px; }
+.run-debug-actions button { display: inline-flex; flex: 1; align-items: center; justify-content: center; gap: 6px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface); color: var(--text); font-size: 11px; cursor: pointer; }
+.run-debug-actions button:first-child { border-color: var(--accent); background: var(--accent); color: white; }
+.run-debug-actions button:disabled { opacity: .4; cursor: default; }
+.run-debug-config details { display: flex; flex-direction: column; gap: 12px; padding-top: 8px; border-top: 1px solid var(--border); }
+.run-debug-config summary { margin-bottom: 10px; color: var(--muted); font-size: 11px; cursor: pointer; }
+.run-debug-controls { display: flex; flex: 0 0 34px; align-items: center; gap: 5px; padding: 0 10px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.run-debug-controls span { flex: 1; overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.run-debug-controls button { display: inline-flex; align-items: center; justify-content: center; width: 25px; height: 25px; border: 0; border-radius: 4px; background: transparent; color: var(--text); cursor: pointer; }
+.run-debug-controls button:hover { background: var(--surface-hover); }
+.run-debug-output-tabs { display: flex; flex: 0 0 30px; align-items: stretch; border-bottom: 1px solid var(--border); }
+.run-debug-output-tabs button { padding: 0 10px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font-size: 10px; cursor: pointer; }
+.run-debug-output-tabs button.selected { border-bottom-color: var(--accent); color: var(--text); }
+.run-debug-output { flex: 1; min-height: 60px; margin: 0; padding: 9px 10px; overflow: auto; color: var(--text); background: var(--bg); font: 10px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 
 /* Blue accent only: intentionally leave every existing background token unchanged. */
 .app.theme-dark,

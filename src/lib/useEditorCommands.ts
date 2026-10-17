@@ -12,7 +12,7 @@ type Options = {
   formatActiveDocument: () => void | Promise<void>;
   openSettings: () => void;
   openAbout: () => void;
-  setSidebarView: Dispatch<SetStateAction<"files" | "search" | "git" | "extensions" | "settings">>;
+  setSidebarView: Dispatch<SetStateAction<"files" | "search" | "git" | "run" | "extensions" | "settings">>;
   setSidebarVisible: Dispatch<SetStateAction<boolean>>;
   setBottomPanel: Dispatch<SetStateAction<"problems" | "terminal" | null>>;
   setTerminalPanelCreated: Dispatch<SetStateAction<boolean>>;
@@ -40,6 +40,7 @@ export function useEditorCommands(options: Options): PaletteCommand[] {
     { id: "view.explorer", label: "Show Explorer", category: "View", run: () => { setSidebarView("files"); setSidebarVisible(true); } },
     { id: "view.search", label: "Show Search", category: "View", run: () => { setSidebarView("search"); setSidebarVisible(true); } },
     { id: "view.source-control", label: "Show Source Control", category: "View", run: () => { setSidebarView("git"); setSidebarVisible(true); } },
+    { id: "view.run-debug", label: "Show Run and Debug", category: "View", run: () => { setSidebarView("run"); setSidebarVisible(true); } },
     { id: "view.problems", label: "Show Problems", category: "View", shortcut: "⌘ ⇧ M", run: () => setBottomPanel("problems") },
     { id: "view.terminal", label: "Show Terminal", category: "View", shortcut: "⌃ `", run: () => { setTerminalPanelCreated(true); setBottomPanel("terminal"); } },
     { id: "view.extensions", label: "Show Extensions", category: "View", run: () => { setSidebarView("extensions"); setSidebarVisible(true); } },

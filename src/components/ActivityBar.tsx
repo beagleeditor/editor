@@ -1,6 +1,6 @@
-import { Files, Search, GitBranch, Settings, Puzzle } from "lucide-react";
+import { Files, Search, GitBranch, Settings, Puzzle, Bug } from "lucide-react";
 
-type SidebarView = "files" | "search" | "git" | "extensions" | "settings";
+type SidebarView = "files" | "search" | "git" | "run" | "extensions" | "settings";
 
 type Props = {
   active: SidebarView;
@@ -15,6 +15,15 @@ export default function ActivityBar({ active, onSelect }: Props) {
         onClick={() => onSelect("files")}
       >
         <Files size={18} />
+      </button>
+
+      <button
+        className={`activity-btn ${active === "run" ? "active" : ""}`}
+        onClick={() => onSelect("run")}
+        title="Run and Debug"
+        aria-label="Run and Debug"
+      >
+        <Bug size={18} />
       </button>
 
       <button

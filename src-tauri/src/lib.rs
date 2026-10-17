@@ -1,4 +1,5 @@
 pub mod fs;
+pub mod debug;
 pub mod git;
 pub mod lsp;
 pub mod search;
@@ -96,6 +97,11 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             git::git_status,
             git::git_diff,
+            debug::debug_start,
+            debug::debug_request,
+            debug::debug_stop,
+            debug::run_start,
+            debug::run_stop,
             git::git_init,
             git::git_stage,
             git::git_unstage,

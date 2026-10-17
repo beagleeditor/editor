@@ -28,6 +28,8 @@ Open **Source Control** to work with Git in the current workspace:
 
 Git must be installed and available to the application. Configure remotes and authentication using your normal Git setup. Review staged changes and the commit message before committing; pull/push can fail if the repository has conflicts, no remote, or missing credentials.
 
+Select a changed filename to open the Monaco diff editor. Unstaged diffs compare the working tree with the index (or `HEAD` when the file is not staged); staged diffs compare the index with `HEAD`. Untracked files appear with an empty original side.
+
 ## Terminal
 
 Open Terminal from the bottom panel or use `Ctrl+``. Create a terminal session to run commands in the workspace directory. Multiple sessions can be open; switch between their tabs, clear the displayed output, stop a running session, or close a session when finished.
@@ -37,3 +39,13 @@ The terminal runs a shell process with your user permissions. Commands can modif
 ## Problems
 
 The Problems panel collects diagnostics reported for open documents by available language tooling. Select a problem to jump to its file and location. The panel can only show diagnostics that BeagleEditor or a configured language server provides; an empty list does not guarantee that code is error-free.
+
+## Code actions
+
+When a configured language server provides code actions, invoke **Quick Fix…** from the editor context menu or press `Cmd+.` on macOS / `Ctrl+.` on Windows and Linux. Actions that include text edits can be applied directly. Availability depends on the language server and the current document diagnostics.
+
+## Run and Debug
+
+Open **Run and Debug** in the activity bar. Set the executable in **Program / executable**, enter one argument per line, and optionally set a working directory. Run starts the process and streams stdout and stderr into the panel; use Stop to terminate it.
+
+Debug uses the Debug Adapter Protocol (DAP). Install a compatible adapter such as `lldb-dap`, set its executable and optional arguments, and configure the program and working directory. Enter comma-separated line numbers to set breakpoints in the active file before launch. Continue, Step Over, Pause, and Stop send standard DAP requests. Debug adapters and launch arguments are stored locally in BeagleEditor settings on this machine; adapter availability and launch fields can vary by debugger.

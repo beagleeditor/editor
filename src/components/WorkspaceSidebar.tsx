@@ -7,12 +7,13 @@ import SearchView from "./SearchView";
 import SourceControl from "./SourceControl";
 import ExtensionsView from "./ExtensionsView";
 import SettingsPage from "./Settings";
+import RunDebugPanel from "./RunDebugPanel";
 import { fsAPI } from "../lib/fs";
 import { searchAPI } from "../lib/search";
 import type { useSettings } from "../lib/useSettings";
 import type { InstalledExtension } from "../lib/extensions";
 
-type SidebarView = "files" | "search" | "git" | "extensions" | "settings";
+type SidebarView = "files" | "search" | "git" | "run" | "extensions" | "settings";
 type FileNode = { name: string; path: string; is_dir: boolean; children?: FileNode[] };
 type Props = {
   sidebarView: SidebarView; sidebarVisible: boolean; sidebarWidth: number;
@@ -25,6 +26,7 @@ type Props = {
   setRenameError: Dispatch<SetStateAction<string | null>>; setRenameTarget: Dispatch<SetStateAction<string | null>>; setRenamePath: Dispatch<SetStateAction<string>>;
   setDeleteError: Dispatch<SetStateAction<string | null>>; setDeleteTarget: Dispatch<SetStateAction<string | null>>;
   workspaceDir: string | null; extensions: InstalledExtension[]; extensionStatus: string; extensionsDirectory: string;
+  activeFile: string | null;
   enabledExtensions: Record<string, boolean>; setEnabledExtensions: Dispatch<SetStateAction<Record<string, boolean>>>;
   reloadExtensions: () => Promise<void>; setExtensionStatus: Dispatch<SetStateAction<string>>;
   installingExtension: boolean; setInstallingExtension: Dispatch<SetStateAction<boolean>>;
@@ -36,7 +38,7 @@ export default function WorkspaceSidebar(props: Props) {
   const { sidebarView, sidebarVisible, sidebarWidth, setSidebarView, setSidebarVisible, setSidebarWidth,
     resizingRef, startX, startWidth, fileTree, openFolder, closeFolder, openFileFromExplorer,
     reloadWorkspace, createItem, setRenameError, setRenameTarget, setRenamePath, setDeleteError,
-    setDeleteTarget, workspaceDir, extensions, extensionStatus, extensionsDirectory, enabledExtensions,
+    setDeleteTarget, workspaceDir, activeFile, extensions, extensionStatus, extensionsDirectory, enabledExtensions,
     setEnabledExtensions, reloadExtensions, setExtensionStatus, installingExtension,
     setInstallingExtension, settings, update, availableColorThemes } = props;
   return (
@@ -51,8 +53,7 @@ export default function WorkspaceSidebar(props: Props) {
               }
             }}
           />
-          {sidebarVisible && (
-            <div className="sidebar-container">
+            <div className="sidebar-container" style={{ display: sidebarVisible ? undefined : "none" }}>
               <div className="sidebar" style={{ width: sidebarWidth }}>
                 {sidebarView === "files" && (
                   <Explorer
@@ -96,6 +97,10 @@ export default function WorkspaceSidebar(props: Props) {
                 )}
 
                 {sidebarView === "git" && <SourceControl root={workspaceDir} />}
+
+                <div style={{ display: sidebarView === "run" ? "flex" : "none", minWidth: 0, minHeight: 0, flex: 1 }}>
+                  <RunDebugPanel root={workspaceDir} activeFile={activeFile} />
+                </div>
 
                 {sidebarView === "extensions" && (
                   <ExtensionsView
@@ -170,7 +175,6 @@ export default function WorkspaceSidebar(props: Props) {
                 }}
               />
             </div>
-          )}
     </>
   );
 }

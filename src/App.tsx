@@ -36,7 +36,7 @@ import type { WorkspaceFileNode } from "./lib/useWorkspaceFiles";
 
 /* ---------------- TYPES ---------------- */
 
-type SidebarView = "files" | "search" | "git" | "extensions" | "settings";
+type SidebarView = "files" | "search" | "git" | "run" | "extensions" | "settings";
 export type Theme = "dark" | "light" | "system";
 
 type ExtensionCommand = PaletteCommand & { extensionId: string };
@@ -327,6 +327,7 @@ export default function App() {
             reloadWorkspace={reloadWorkspace} createItem={createItem} setRenameError={setRenameError}
             setRenameTarget={setRenameTarget} setRenamePath={setRenamePath} setDeleteError={setDeleteError}
             setDeleteTarget={setDeleteTarget} workspaceDir={workspaceDir} extensions={extensions}
+            activeFile={activeTab?.path ?? null}
             extensionStatus={extensionStatus} extensionsDirectory={extensionsDirectory} enabledExtensions={enabledExtensions}
             setEnabledExtensions={setEnabledExtensions} reloadExtensions={reloadExtensions} setExtensionStatus={setExtensionStatus}
             installingExtension={installingExtension} setInstallingExtension={setInstallingExtension}
