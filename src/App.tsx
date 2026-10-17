@@ -291,6 +291,21 @@ export default function App() {
     }, 80);
   }, [openFileFromExplorer]);
 
+  const openTerminalLocation = useCallback(async ({ path, line, column }: { path: string; line: number; column: number }) => {
+    const absolute = path.startsWith("/") || /^[A-Za-z]:[\\/]/.test(path);
+    const root = workspaceDir?.replace(/[\\/]+$/, "");
+    const resolvedPath = absolute || !root ? path : `${root}/${path.replace(/^\.\//, "")}`;
+    await openFileFromExplorer(resolvedPath);
+    setShowWelcome(false);
+    window.setTimeout(() => {
+      const editor = editorRef.current;
+      if (!editor) return;
+      editor.revealLineInCenter(line);
+      editor.setPosition({ lineNumber: line, column });
+      editor.focus();
+    }, 80);
+  }, [openFileFromExplorer, workspaceDir]);
+
   const commands = useEditorCommands({
     extensionCommands, newFile, openFile, openFolder, closeFolder, saveFile, formatActiveDocument,
     openSettings, openAbout, setSidebarView, setSidebarVisible, setBottomPanel, setTerminalPanelCreated,
@@ -360,7 +375,7 @@ export default function App() {
               openRecentFolder={openRecentFolder}
             />
             {bottomPanel === "problems" && <ProblemsPanel problems={allProblems} onSelect={(problem) => void openProblem(problem)} onClose={() => setBottomPanel(null)} />}
-            {terminalPanelCreated && <div style={{ display: bottomPanel === "terminal" ? "contents" : "none" }}><TerminalPanel cwd={workspaceDir} onClose={() => setBottomPanel(null)} /></div>}
+            {terminalPanelCreated && <div style={{ display: bottomPanel === "terminal" ? "contents" : "none" }}><TerminalPanel cwd={workspaceDir} onClose={() => setBottomPanel(null)} onOpenLocation={(location) => void openTerminalLocation(location)} /></div>}
           </main>
         </div>
 

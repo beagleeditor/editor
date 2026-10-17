@@ -92,6 +92,11 @@ pub fn run() {
             }
             _ => {}
         })
+        .on_window_event(|_window, event| {
+            if matches!(event, tauri::WindowEvent::Destroyed) {
+                terminal::terminal_shutdown();
+            }
+        })
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .invoke_handler(tauri::generate_handler![
@@ -109,7 +114,9 @@ pub fn run() {
             git::git_push,
             git::git_pull,
             terminal::terminal_start,
+            terminal::terminal_list_tasks,
             terminal::terminal_write,
+            terminal::terminal_resize,
             terminal::terminal_stop,
             read_dir,
             fs::list_extensions,

@@ -32,7 +32,9 @@ Select a changed filename to open the Monaco diff editor. Unstaged diffs compare
 
 ## Terminal
 
-Open Terminal from the bottom panel or use `Ctrl+``. BeagleEditor starts your configured default shell (`$SHELL` on macOS/Linux, or `COMSPEC` on Windows) in the workspace directory. Each submitted command gets its own block with streamed output, exit status, and elapsed time. Multiple sessions can be open; switch between their tabs, clear the displayed output, stop a running session, or close a session when finished. This block-based input is designed for running commands, not full-screen interactive terminal programs that require a real TTY.
+Open Terminal from the bottom panel or use `Ctrl+``. BeagleEditor starts your configured default shell (`$SHELL` on macOS/Linux, or `COMSPEC` on Windows) inside a real pseudo-terminal. It supports interactive programs, shell history, terminal control sequences and colors, terminal resizing, Ctrl+C, and programs such as `vim` and `htop`. Sessions remain alive when the panel is hidden; create multiple sessions, switch between tabs, or split the view to watch two sessions at once. Closing a session terminates its shell.
+
+Use the search action to find text in terminal scrollback, copy selected text, and click recognized `path:line[:column]` locations in compiler output to open that location in the editor. The task action detects common project commands from `Cargo.toml`, `package.json` scripts, Flutter `pubspec.yaml`, Python test configuration, and `Makefile`; tasks are only run when selected. Terminal output is rendered by xterm.js, with a 10,000-line scrollback buffer. Hiding the panel does not stop processes, but closing the application or an individual terminal ends that terminal session.
 
 The terminal runs a shell process with your user permissions. Commands can modify or delete files and access your environment, so run only commands you understand and trust.
 
