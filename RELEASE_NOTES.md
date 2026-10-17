@@ -1,48 +1,32 @@
-This is the biggest BeagleEditor update ever 🎉🐶
+# BeagleEditor v26.4.2 — Aurora Update
 
-BeagleEditor has been busy sniffing out bugs, fetching smarter editor features, and generally becoming a much more capable coding companion. This update brings a big leap forward in language tooling, a refreshed interface, and—drumroll, please—a JavaScript extension system!
+This Aurora patch makes BeagleEditor a more capable workspace editor, with a real interactive terminal, smoother run/debug workflows, better language tooling, and a much more useful Extensions API.
 
-## ✨ New tricks
+## What's new
 
-### 🧩 Extensions have entered the chat
+### Extensions API
 
-- BeagleEditor now supports local JavaScript extensions.
-- Browse installed extensions in the new Extensions view, then enable or disable them when you need them.
-- Extensions can add commands to the Command Palette, show messages, and inspect the active document.
-- There’s a Hello World extension example to help you get started.
-- Want to build your own? Check out the new [Extension Development Guide](docs/extensions.md).
+- Added filesystem APIs to list directories, check paths, create files and directories, rename or delete paths, and reveal paths in the system file manager.
+- Added editor language controls and line inspection APIs.
+- Added selection-change and document-change events, with automatic subscription cleanup when extensions deactivate.
+- Expanded the extension development documentation with API descriptions and examples.
 
-### 🧠 Smarter language support
+### Terminal and workspace tools
 
-- Added Language Server Protocol (LSP) support, giving compatible language servers a way to power editor intelligence.
-- Added code completion, hover information, Go to Definition, and signature help.
-- Expanded language-server handling for more languages.
-- Fixed language-server switching when jumping between files written in different languages. No more asking the wrong server for directions!
+- Added interactive pseudo-terminal sessions with shell history, ANSI colors, terminal resizing, and support for full-screen terminal programs.
+- Added multiple terminal sessions, tabs, split view, scrollback search, and clickable file locations in compiler output.
+- Improved terminal cursor visibility and focus handling.
+- Added project task detection for common Cargo, JavaScript, Flutter, Python, and Makefile workflows.
+- Added a Git diff editor for reviewing workspace changes.
 
-## 🎨 A fresh coat of polish
+### Language tooling and editor workflow
 
-- Refined the editor’s overall design and interface.
-- Improved tabs and status-bar details.
-- Added a Command Palette for quickly finding and running commands.
-- Fixed editor resizing so the editor follows the window instead of trying to escape it.
-- Fixed overflowing editor content that could shove tabs around. Tabs deserve personal space, too.
+- Added LSP code actions and quick-fix support.
+- Improved run and debug workflows.
+- Refined workspace component structure and editor responsiveness.
+- Continued improving extension themes and the consistency of theme styling across the app.
 
-## 🛠️ Under the hood
+## Notes
 
-- Improved editor and language-server lifecycle handling.
-- Made layout and resize behavior more reliable.
-- Added extension installation-directory discovery and manifest loading.
-- Expanded project documentation, including a dedicated guide for extension developers.
-
-## 🐾 Get started
-
-- Open the **Extensions** view to explore installed extensions.
-- Read [`docs/extensions.md`](docs/extensions.md) to create your own.
-- Use the **Command Palette** to find commands without going on a menu safari.
-- Open a supported project and try the language features provided by its configured language server.
-
-## ⚠️ A tiny but important extension note
-
-Extensions run JavaScript inside BeagleEditor’s WebView and are **not sandboxed**. Only install or enable extensions you trust. Keep your coding paws safe!
-
-Thanks for building with BeagleEditor. Now go write something brilliant—and please, no barking at the compiler. 🐕‍💻
+- Extensions run in the editor's WebView and are not sandboxed. Install and enable only extensions you trust.
+- The release workflow builds installers for macOS Apple silicon, macOS Intel, Linux, and Windows.
