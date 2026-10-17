@@ -224,6 +224,34 @@ Returns the current workspace folder path, or `null` when no folder is open.
 
 Read UTF-8 text from a path or write UTF-8 text to a path. Both return promises; filesystem errors reject the promise. `writeFile` updates the content and saved state of an already-open tab at the same path. These APIs use the editor's filesystem backend and are not restricted to the current workspace, so only use paths you trust.
 
+### Additional filesystem APIs
+
+These APIs use BeagleEditor's filesystem backend and return promises:
+
+- `api.readDirectory(path)` — returns entries with `name`, `path`, and `is_dir` fields for the requested directory.
+- `api.pathExists(path)` — resolves to `true` if the path exists, otherwise `false`.
+- `api.createFile(path)` — creates an empty file. It rejects if creation fails.
+- `api.createDirectory(path)` — creates one directory. Its parent must already exist, and the destination must not already exist.
+- `api.renamePath(oldPath, newPath)` — renames or moves a filesystem path, subject to filesystem rules and permissions.
+- `api.deletePath(path)` — deletes the requested path. Use carefully; this operation can remove user data.
+- `api.revealPath(path)` — asks the operating system to reveal the path in the file manager.
+
+```js
+export async function activate(api) {
+  const root = api.getWorkspaceDirectory();
+  if (!root) {
+    api.showMessage("Open a workspace first.");
+    return;
+  }
+
+  const entries = await api.readDirectory(root);
+  const files = entries.filter((entry) => !entry.is_dir);
+  api.showMessage(`Found ${files.length} files in the workspace root.`);
+}
+```
+
+These APIs are not confined to the open workspace. Extensions have no filesystem permission prompts or sandbox, so only use paths you trust and avoid destructive operations without explicit user intent.
+
 ### `api.searchWorkspace(query)`
 
 Searches file contents in the open workspace and returns matches with `path`, `line`, and `text` fields. Returns an empty array for a blank query and rejects if no workspace is open or a search fails.
@@ -239,6 +267,30 @@ Replaces the current editor selection with the supplied string, focuses the edit
 ### `api.getEditorPosition()`
 
 Returns the cursor position as `{ lineNumber, column }`, or `null` when no editor position is available. Both coordinates are one-based.
+
+### `api.getEditorLanguage()` and `api.setEditorLanguage(language)`
+
+`getEditorLanguage()` returns the active Monaco language identifier, or `null` if no editor model is active.
+
+`setEditorLanguage(language)` changes the active editor model's language and updates the active tab's language metadata. It returns `true` on success or `false` when the argument is invalid or no active editor/document is available. Supply a Monaco language identifier such as `typescript`, `python`, `json`, or `markdown`.
+
+### `api.getEditorLineCount()` and `api.getEditorLineContent(lineNumber)`
+
+- `getEditorLineCount()` returns the active document's number of lines, or `null` if no model is active.
+- `getEditorLineContent(lineNumber)` returns the text of a one-based line, or `null` if no model is active or the line number is invalid.
+
+```js
+export function activate(api) {
+  return api.registerCommand({
+    id: "show-line-count",
+    title: "Show Active Document Line Count",
+    run: () => {
+      const count = api.getEditorLineCount();
+      api.showMessage(count === null ? "No active document." : `Lines: ${count}`);
+    },
+  });
+}
+```
 
 ### `api.setEditorPosition(lineNumber, column)`
 
@@ -296,6 +348,43 @@ Replaces the active document's entire content and marks the tab as having unsave
 
 Subscribes to active-tab changes. The listener is called immediately with the current document snapshot (or `null`), then again when the active tab changes. Returns an unsubscribe function; call it during cleanup. Listener errors are caught and logged so they do not break the editor.
 
+### `api.onDidChangeEditorSelection(listener)`
+
+Subscribes to editor selection/cursor changes and returns an unsubscribe function. The listener receives `null` if the editor or selection is unavailable; otherwise it receives `text`, `startLineNumber`, `startColumn`, `endLineNumber`, `endColumn`, and `isEmpty`. Coordinates are one-based. The callback is triggered by selection changes; it is not called immediately upon registration.
+
+```js
+export function activate(api) {
+  const unsubscribe = api.onDidChangeEditorSelection((selection) => {
+    if (selection && !selection.isEmpty) {
+      console.log("Selected text:", selection.text);
+    }
+  });
+  return unsubscribe;
+}
+```
+
+### `api.onDidChangeTextDocument(listener)`
+
+Subscribes to content changes in the active editor model and returns an unsubscribe function. The listener receives:
+
+- `document`: the current document snapshot.
+- `changes`: Monaco content-change entries, including `range`, `rangeOffset`, `rangeLength`, and inserted `text`.
+- `versionId`: the model version after the change.
+- `isUndoing` and `isRedoing`: whether the change is part of an undo or redo operation.
+
+The callback is not called immediately on registration. It reports changes made to the editor model; it is not a filesystem watcher and does not notify extensions about external file changes that have not been loaded into the editor.
+
+```js
+export function activate(api) {
+  const unsubscribe = api.onDidChangeTextDocument(({ document, changes }) => {
+    console.log(`${document.name}: ${changes.length} content change(s)`);
+  });
+  return unsubscribe;
+}
+```
+
+The runtime automatically disposes these event subscriptions when the extension is deactivated, even if the extension forgets to call its returned unsubscribe function. Extensions should still unsubscribe when they no longer need a listener.
+
 Example:
 
 ```js
@@ -339,7 +428,7 @@ The current API is intentionally small. It does **not** currently provide:
 - VS Code extension compatibility or a package marketplace.
 - A dependency manager or extension installer.
 - Custom editor actions or custom sidebar panels.
-- Fine-grained document change events, range-based edits beyond replacing the current selection, or an editor save-command API.
+- Range-based editor edits, an editor save-command API, or filesystem watcher events.
 - A stable public API guarantee across releases.
 - A sandbox or permission system. Extensions execute in the editor web view and should be treated as trusted code.
 

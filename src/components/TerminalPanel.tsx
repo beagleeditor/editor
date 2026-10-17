@@ -242,8 +242,12 @@ function TerminalView({
     const terminal = new Terminal({
       allowProposedApi: false,
       convertEol: false,
-      cursorBlink: true,
-      cursorStyle: "bar",
+      // A solid block remains visible even when the WebView loses focus or
+      // the platform's caret blink is hard to notice.
+      cursorBlink: false,
+      cursorStyle: "block",
+      cursorInactiveStyle: "block",
+      cursorWidth: 2,
       disableStdin: !session.running,
       fontFamily: '"SFMono-Regular", Menlo, Monaco, "Cascadia Code", monospace',
       fontSize: 12,
@@ -269,7 +273,14 @@ function TerminalView({
       if (runningRef.current) onInputRef.current(session.id, data);
     });
     const onHostFocus = () => onFocus(session.id);
+    const focusTerminal = () => {
+      onFocus(session.id);
+      terminal.focus();
+      // Some shell startup scripts leave DECTCEM (cursor visibility) disabled.
+      terminal.write("\x1b[?25h");
+    };
     hostRef.current.addEventListener("focusin", onHostFocus);
+    hostRef.current.addEventListener("pointerdown", focusTerminal);
 
     terminal.attachCustomKeyEventHandler((event) => {
       const mac = navigator.platform.toLowerCase().includes("mac");
@@ -341,6 +352,7 @@ function TerminalView({
       themeObserver?.disconnect();
       window.removeEventListener("resize", onWindowResize);
       hostRef.current?.removeEventListener("focusin", onHostFocus);
+      hostRef.current?.removeEventListener("pointerdown", focusTerminal);
       dataSubscription.dispose();
       onReady(session.id, null);
       terminal.dispose();
@@ -360,6 +372,7 @@ function TerminalView({
         fitRef.current?.fit();
         if (terminalRef.current) onResize(session.id, terminalRef.current.cols, terminalRef.current.rows);
         terminalRef.current?.focus();
+        terminalRef.current?.write("\x1b[?25h");
       } catch { /* Wait for the panel to become measurable. */ }
     });
   }, [active, onResize, session.id]);

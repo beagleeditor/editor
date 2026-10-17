@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import type { MutableRefObject, Dispatch, SetStateAction } from "react";
 import { fsAPI } from "./fs";
 import { searchAPI } from "./search";
+import * as monaco from "monaco-editor";
 import type { Tab } from "../components/EditorTabs";
 import type { PaletteCommand } from "../components/CommandPalette";
 
@@ -38,6 +39,13 @@ export function useExtensionRuntime({ extensions, enabledExtensions, activeTabRe
       for (const extension of extensions) {
         const id = extension.manifest.id;
         if (enabledExtensions[id] === false || extension.manifest.type === "theme") continue;
+        const apiDisposers: Array<() => void> = [];
+        const trackDisposable = (dispose: () => void) => {
+          let disposed = false;
+          const once = () => { if (disposed) return; disposed = true; dispose(); };
+          apiDisposers.push(once);
+          return once;
+        };
         try {
           const moduleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(extension.entry)}`;
           const module = await import(/* @vite-ignore */ moduleUrl) as { activate?: (api: any) => unknown | Promise<unknown> };
@@ -89,6 +97,13 @@ export function useExtensionRuntime({ extensions, enabledExtensions, activeTabRe
             getOpenDocuments: () => tabsRef.current.map(snapshot),
             getWorkspaceDirectory: () => workspaceDirRef.current,
             readFile: (path: string) => fsAPI.readFile(path),
+            readDirectory: (path: string) => fsAPI.readDir(path),
+            pathExists: (path: string) => fsAPI.exists(path),
+            createFile: (path: string) => fsAPI.createFile(path),
+            createDirectory: (path: string) => fsAPI.createDir(path),
+            renamePath: (oldPath: string, newPath: string) => fsAPI.renamePath(oldPath, newPath),
+            deletePath: (path: string) => fsAPI.deletePath(path),
+            revealPath: (path: string) => fsAPI.revealInFinder(path),
             writeFile: async (path: string, content: string) => {
               if (typeof path !== "string" || !path.trim()) throw new TypeError("A file path is required.");
               if (typeof content !== "string") throw new TypeError("File content must be a string.");
@@ -117,6 +132,23 @@ export function useExtensionRuntime({ extensions, enabledExtensions, activeTabRe
             getEditorPosition: () => {
               const position = editorRef.current?.getPosition?.();
               return position ? { lineNumber: position.lineNumber, column: position.column } : null;
+            },
+            getEditorLanguage: () => editorRef.current?.getModel?.()?.getLanguageId?.() ?? null,
+            setEditorLanguage: (language: string) => {
+              if (typeof language !== "string" || !language.trim()) return false;
+              const editor = editorRef.current;
+              const model = editor?.getModel?.();
+              const tab = activeTabRef.current;
+              if (!editor || !model || !tab) return false;
+              monaco.editor.setModelLanguage(model, language.trim());
+              setTabs((previous) => previous.map((item) => item.id === tab.id ? { ...item, language: language.trim() } : item));
+              return true;
+            },
+            getEditorLineCount: () => editorRef.current?.getModel?.()?.getLineCount?.() ?? null,
+            getEditorLineContent: (lineNumber: number) => {
+              const model = editorRef.current?.getModel?.();
+              if (!model || !Number.isInteger(lineNumber) || lineNumber < 1 || lineNumber > model.getLineCount()) return null;
+              return model.getLineContent(lineNumber);
             },
             setEditorDecorations: (decorations: Array<{ lineNumber: number; className?: string; glyphMarginClassName?: string; hoverMessage?: string; isWholeLine?: boolean }>) => {
               const model = editorRef.current?.getModel?.();
@@ -162,10 +194,44 @@ export function useExtensionRuntime({ extensions, enabledExtensions, activeTabRe
               if (typeof listener !== "function") return () => {};
               activeDocumentListeners.current.add(listener);
               try { listener(snapshot(activeTabRef.current)); } catch (error) { console.error(`Extension ${id} active-document listener failed:`, error); }
-              return () => activeDocumentListeners.current.delete(listener);
+              return trackDisposable(() => activeDocumentListeners.current.delete(listener));
+            },
+            onDidChangeEditorSelection: (listener: (event: { text: string; startLineNumber: number; startColumn: number; endLineNumber: number; endColumn: number; isEmpty: boolean } | null) => void) => {
+              const editor = editorRef.current;
+              if (typeof listener !== "function" || !editor?.onDidChangeCursorSelection) return () => {};
+              const subscription = editor.onDidChangeCursorSelection(() => {
+                try {
+                  const model = editor.getModel?.();
+                  const selection = editor.getSelection?.();
+                  listener(!model || !selection ? null : {
+                    text: model.getValueInRange(selection),
+                    startLineNumber: selection.startLineNumber,
+                    startColumn: selection.startColumn,
+                    endLineNumber: selection.endLineNumber,
+                    endColumn: selection.endColumn,
+                    isEmpty: selection.isEmpty(),
+                  });
+                } catch (error) { console.error(`Extension ${id} selection listener failed:`, error); }
+              });
+              return trackDisposable(() => subscription.dispose());
+            },
+            onDidChangeTextDocument: (listener: (event: { document: Snapshot; changes: Array<{ range: unknown; rangeOffset: number; rangeLength: number; text: string }>; versionId: number; isUndoing: boolean; isRedoing: boolean }) => void) => {
+              const editor = editorRef.current;
+              if (typeof listener !== "function" || !editor?.onDidChangeModelContent) return () => {};
+              const subscription = editor.onDidChangeModelContent((event: any) => {
+                try {
+                  const document = snapshot(activeTabRef.current);
+                  if (!document) return;
+                  listener({ document, changes: event.changes, versionId: event.versionId, isUndoing: event.isUndoing, isRedoing: event.isRedoing });
+                } catch (error) { console.error(`Extension ${id} document-change listener failed:`, error); }
+              });
+              return trackDisposable(() => subscription.dispose());
             },
           });
           disposers.set(id, () => {
+            for (const dispose of apiDisposers.splice(0).reverse()) {
+              try { dispose(); } catch (error) { console.error(`Extension ${id} API cleanup failed:`, error); }
+            }
             for (const item of registeredStatusItems.values()) {
               const index = statusItems.findIndex((entry) => entry.id === item.id);
               if (index !== -1) statusItems.splice(index, 1);
@@ -174,7 +240,13 @@ export function useExtensionRuntime({ extensions, enabledExtensions, activeTabRe
             if (typeof result === "function") (result as () => void)();
             else if (result && typeof (result as { dispose?: unknown }).dispose === "function") (result as { dispose: () => void }).dispose();
           });
-        } catch (error) { console.error(`Extension ${id} failed to activate:`, error); setExtensionStatus(`${extension.manifest.name} failed to activate; see console`); }
+        } catch (error) {
+          for (const dispose of apiDisposers.splice(0).reverse()) {
+            try { dispose(); } catch (cleanupError) { console.error(`Extension ${id} API cleanup failed:`, cleanupError); }
+          }
+          console.error(`Extension ${id} failed to activate:`, error);
+          setExtensionStatus(`${extension.manifest.name} failed to activate; see console`);
+        }
       }
       if (!cancelled) setExtensionCommands([...commands]);
     };
