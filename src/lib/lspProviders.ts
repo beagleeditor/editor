@@ -134,9 +134,9 @@ function registerCodeActionProvider(monaco: typeof import("monaco-editor"), lang
             isPreferred: action.isPreferred,
             diagnostics: context.markers,
             edit: workspaceEdits.length ? { edits: workspaceEdits } : undefined,
-            command: action.command ? { id: action.command.command, title: action.command.title, arguments: action.command.arguments } : undefined,
+            command: undefined,
           };
-        }).filter((action) => action.edit || action.command);
+        }).filter((action) => action.edit);
         return { actions: edits, dispose() {} };
       } catch (error) {
         console.error("LSP code actions failed:", error);

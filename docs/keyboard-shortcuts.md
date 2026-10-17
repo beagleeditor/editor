@@ -11,6 +11,7 @@ The shortcuts below are the primary documented shortcuts. `Cmd` refers to the Co
 | Quick Open | `Cmd+P` | `Ctrl+P` |
 | Command Palette | `Cmd+Shift+P` | `Ctrl+Shift+P` |
 | Format Document | `Cmd+Shift+I` | `Ctrl+Shift+I` |
+| Quick Fix | `Cmd+.` | `Ctrl+.` |
 | Show Problems | `Cmd+Shift+M` | `Ctrl+Shift+M` |
 | Toggle Terminal | `Ctrl+`` | `Ctrl+`` |
 | Toggle Sidebar | `Cmd+B` | `Ctrl+B` |

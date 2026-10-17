@@ -61,6 +61,7 @@ export default function EditorSurface(props: Props) {
                           editorRef.current = editor;
                           setEditorInstance(editor);
                           addFormatAction(editor, monaco);
+                          registerQuickFixAction(editor, monaco);
                           if (activeTab?.language) {
                             ensureLanguageProviders(monaco, activeTab.language);
                           }
@@ -124,6 +125,7 @@ export default function EditorSurface(props: Props) {
                   editorRef.current = editor;
                   setEditorInstance(editor);
                   addFormatAction(editor, monaco);
+                  registerQuickFixAction(editor, monaco);
                   if (activeTab?.language) {
                     ensureLanguageProviders(monaco, activeTab.language);
                   }
@@ -245,4 +247,14 @@ export default function EditorSurface(props: Props) {
             )}
     </>
   );
+}
+
+function registerQuickFixAction(editor: any, monacoInstance: typeof monaco) {
+  editor.addAction({
+    id: "beagle.quickFix",
+    label: "Quick Fix…",
+    keybindings: [monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.Period],
+    contextMenuGroupId: "navigation",
+    run: () => editor.trigger("keyboard", "editor.action.quickFix", {}),
+  });
 }
