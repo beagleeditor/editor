@@ -462,8 +462,14 @@ function TreeNode({
     return (
       <div
         className="file-item"
+        role="button"
+        tabIndex={0}
+        aria-label={`Open ${node.name}`}
         style={{ paddingLeft: depth * 14 }}
         onClick={handleClick}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") { event.preventDefault(); void handleClick(); }
+        }}
         onContextMenu={(e) => {
           e.preventDefault();
           onContextMenu({
@@ -488,8 +494,15 @@ function TreeNode({
     <div>
       <div
         className="folder-item"
+        role="button"
+        tabIndex={0}
+        aria-expanded={open}
+        aria-label={`${open ? "Collapse" : "Expand"} folder ${node.name}`}
         style={{ paddingLeft: depth * 14 }}
         onClick={handleClick}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") { event.preventDefault(); void handleClick(); }
+        }}
         onContextMenu={(e) => {
           e.preventDefault();
           onContextMenu({

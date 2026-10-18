@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { cloneElement, isValidElement, useId, useState, type ReactNode } from "react";
 import { defaultSettings, type Settings } from "../lib/settings";
 import Dialog from "./Dialog";
 
@@ -14,13 +14,17 @@ type Props = {
 type SettingRowProps = { label: string; description?: string; children: ReactNode };
 
 function SettingRow({ label, description, children }: SettingRowProps) {
+  const controlId = useId();
+  const control = isValidElement<{ id?: string; "aria-label"?: string }>(children)
+    ? cloneElement(children, { id: controlId, "aria-label": label })
+    : children;
   return (
     <div className="setting-item">
       <div className="setting-copy">
-        <label>{label}</label>
+        <label htmlFor={controlId}>{label}</label>
         {description && <span>{description}</span>}
       </div>
-      {children}
+      {control}
     </div>
   );
 }
@@ -32,7 +36,7 @@ function Toggle({ label, description, value, onChange }: {
   onChange: (value: boolean) => void;
 }) {
   return <SettingRow label={label} description={description}>
-    <input type="checkbox" checked={value} onChange={(event) => onChange(event.target.checked)} />
+    <input type="checkbox" aria-label={label} checked={value} onChange={(event) => onChange(event.target.checked)} />
   </SettingRow>;
 }
 
@@ -124,9 +128,9 @@ export default function SettingsPage({ settings, update, colorThemes, workspaceD
       </div>
       {confirmReset && (
         <Dialog
-          title="Are you REALLY sure?"
-          message="This will reset every custom settings you set. Are you sure?"
-          confirmText="Reset settings"
+          title="Reset settings to defaults?"
+          message="This will restore the default values for all settings in the selected scope. This action cannot be undone."
+          confirmText="Reset defaults"
           cancelText="Cancel"
           onConfirm={reset}
           onCancel={() => setConfirmReset(false)}

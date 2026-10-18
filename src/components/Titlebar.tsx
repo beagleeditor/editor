@@ -37,7 +37,9 @@ export default function TitleBar({ theme, query, onQueryChange, onOpenQuickOpen,
           }
         }}
         onFocus={() => {
-          if (!commandPaletteOpen) onOpenQuickOpen();
+          // Focusing the shared search field while a picker is already open
+          // must not switch its mode back to file Quick Open.
+          if (!commandPaletteOpen && !quickOpenOpen) onOpenQuickOpen();
         }}
       />
     </div>

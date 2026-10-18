@@ -13,6 +13,9 @@ export default function ActivityBar({ active, onSelect }: Props) {
       <button
         className={`activity-btn ${active === "files" ? "active" : ""}`}
         onClick={() => onSelect("files")}
+        title="Explorer"
+        aria-label="Explorer"
+        aria-pressed={active === "files"}
       >
         <Files size={18} />
       </button>
@@ -22,6 +25,7 @@ export default function ActivityBar({ active, onSelect }: Props) {
         onClick={() => onSelect("run")}
         title="Run and Debug"
         aria-label="Run and Debug"
+        aria-pressed={active === "run"}
       >
         <Bug size={18} />
       </button>
@@ -29,6 +33,9 @@ export default function ActivityBar({ active, onSelect }: Props) {
       <button
         className={`activity-btn ${active === "search" ? "active" : ""}`}
         onClick={() => onSelect("search")}
+        title="Search"
+        aria-label="Search"
+        aria-pressed={active === "search"}
       >
         <Search size={18} />
       </button>
@@ -38,6 +45,7 @@ export default function ActivityBar({ active, onSelect }: Props) {
         onClick={() => onSelect("git")}
         title="Source Control"
         aria-label="Source Control"
+        aria-pressed={active === "git"}
       >
         <GitBranch size={18} />
       </button>
@@ -47,6 +55,7 @@ export default function ActivityBar({ active, onSelect }: Props) {
         onClick={() => onSelect("extensions")}
         title="Extensions"
         aria-label="Extensions"
+        aria-pressed={active === "extensions"}
       >
         <Puzzle size={18} />
       </button>
@@ -56,6 +65,9 @@ export default function ActivityBar({ active, onSelect }: Props) {
       <button
         className={`activity-btn ${active === "settings" ? "active" : ""}`}
         onClick={() => onSelect("settings")}
+        title="Settings"
+        aria-label="Settings"
+        aria-pressed={active === "settings"}
       >
         <Settings size={18} />
       </button>

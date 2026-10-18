@@ -54,6 +54,7 @@ export default function SearchView({ root, search, onOpenFile }: Props) {
         <input
           className="search-input"
           placeholder="Search in files..."
+          aria-label="Search in workspace files"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
@@ -71,6 +72,9 @@ export default function SearchView({ root, search, onOpenFile }: Props) {
           <div
             key={`${r.path}-${r.line}-${i}`}
             className="search-item"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpenFile(r.path, r.line); } }}
             onClick={() => onOpenFile(r.path, r.line)}
           >
             <div className="search-path">{r.path}</div>

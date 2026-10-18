@@ -66,7 +66,7 @@ export default function QuickOpen({
   // 🔄 reset selection when results change
   useEffect(() => {
     setSelected(0);
-  }, [query, files]);
+  }, [query, files, mode, itemCount]);
 
   // ⌨️ keyboard navigation
   useEffect(() => {
