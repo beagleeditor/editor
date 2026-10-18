@@ -165,6 +165,7 @@ export default function WorkspaceSidebar(props: Props) {
                     settings={settings}
                     update={update}
                     colorThemes={availableColorThemes.map((extension) => ({ id: extension.manifest.id, name: extension.manifest.name }))}
+                    workspaceDir={workspaceDir}
                   />
                 )}
               </div>

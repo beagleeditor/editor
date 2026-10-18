@@ -6,6 +6,7 @@ type Props = {
   settings: Settings;
   update: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
   colorThemes: { id: string; name: string }[];
+  workspaceDir: string | null;
 };
 
 type SettingRowProps = { label: string; description?: string; children: ReactNode };
@@ -33,7 +34,7 @@ function Toggle({ label, description, value, onChange }: {
   </SettingRow>;
 }
 
-export default function SettingsPage({ settings, update, colorThemes }: Props) {
+export default function SettingsPage({ settings, update, colorThemes, workspaceDir }: Props) {
   const [confirmReset, setConfirmReset] = useState(false);
 
   const reset = () => {
@@ -48,7 +49,7 @@ export default function SettingsPage({ settings, update, colorThemes }: Props) {
       <div className="settings-heading">
         <div>
           <div className="search-title">SETTINGS</div>
-          <p>Make the editor fit your workflow.</p>
+          <p>{workspaceDir ? `Settings for ${workspaceDir}. Saved locally for this workspace.` : "Global settings. Open a workspace to customize it independently."}</p>
         </div>
         <button className="settings-reset" onClick={() => setConfirmReset(true)}>Reset defaults</button>
       </div>

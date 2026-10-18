@@ -31,6 +31,7 @@ import { useExtensionManager } from "./lib/useExtensionManager";
 import { useEditorCommands } from "./lib/useEditorCommands";
 import { useEditorFormatting } from "./lib/useEditorFormatting";
 import { useAppearance } from "./lib/useAppearance";
+import { useWorkspacePreferences } from "./lib/useWorkspacePreferences";
 import type { InstalledExtension } from "./lib/extensions";
 import type { WorkspaceFileNode } from "./lib/useWorkspaceFiles";
 
@@ -119,7 +120,7 @@ export default function App() {
   const [extensionCommands, setExtensionCommands] = useState<ExtensionCommand[]>([]);
   const [extensionStatusItems, setExtensionStatusItems] = useState<Array<{ id: string; extensionId: string; text: string; tooltip?: string; alignment: "left" | "right"; priority: number; run?: () => void | Promise<void> }>>([]);
   const { extensions, extensionStatus, setExtensionStatus, extensionsDirectory, installingExtension,
-    setInstallingExtension, enabledExtensions, setEnabledExtensions, reloadExtensions } = useExtensionManager();
+    setInstallingExtension, enabledExtensions: globalEnabledExtensions, setEnabledExtensions: setGlobalEnabledExtensions, reloadExtensions } = useExtensionManager();
   const activeDocumentListeners = useRef(new Set<(document: ReturnType<typeof getDocumentSnapshot>) => void>());
 
   function getDocumentSnapshot(tab: Tab | undefined) {
@@ -130,14 +131,7 @@ export default function App() {
 
   const [booting, setBooting] = useState(true);
 
-  const { settings, update } = useSettings();
-  const { theme, editorTheme, themeStyle, availableColorThemes, selectedExtensionTheme } =
-    useAppearance(settings, extensions, enabledExtensions);
-
-  useEffect(() => {
-    sidebarWidthRef.current = settings.sidebarWidth;
-    setSidebarWidth(settings.sidebarWidth);
-  }, [settings.sidebarWidth]);
+  const { settings: globalSettings, update: updateGlobalSetting } = useSettings();
 
   const [quickOpenVisible, setQuickOpenVisible] = useState(false);
   const [quickOpenMode, setQuickOpenMode] = useState<"files" | "themes">("files");
@@ -168,6 +162,16 @@ export default function App() {
   /* ---------------- FILE SYSTEM ---------------- */
 
   const [workspaceDir, setWorkspaceDir] = useState<string | null>(null);
+  const { settings, updateSetting, enabledExtensions, updateEnabledExtensions } = useWorkspacePreferences(
+    workspaceDir, globalSettings, updateGlobalSetting, globalEnabledExtensions, setGlobalEnabledExtensions,
+  );
+  const { theme, editorTheme, themeStyle, availableColorThemes, selectedExtensionTheme } =
+    useAppearance(settings, extensions, enabledExtensions);
+
+  useEffect(() => {
+    sidebarWidthRef.current = settings.sidebarWidth;
+    setSidebarWidth(settings.sidebarWidth);
+  }, [settings.sidebarWidth]);
   const workspaceDirRef = useRef<string | null>(workspaceDir);
   workspaceDirRef.current = workspaceDir;
   const [bottomPanel, setBottomPanel] = useState<"problems" | "terminal" | null>(null);
@@ -301,7 +305,7 @@ export default function App() {
 
   useAppEvents({
     openFile, openFolder, closeFolder, saveFile, openSettings, openAbout,
-    resizingRef, startX, startWidth, sidebarWidthRef, sidebarWidth, setSidebarWidth, update,
+    resizingRef, startX, startWidth, sidebarWidthRef, sidebarWidth, setSidebarWidth, update: updateSetting,
     editorInstance, setQuickOpenVisible, setSidebarVisible, setCommandPaletteVisible,
     setCommandPaletteQuery, setBottomPanel, setTerminalPanelCreated,
   });
@@ -376,7 +380,7 @@ export default function App() {
         setCommandPaletteQuery={setCommandPaletteQuery} quickOpenVisible={quickOpenVisible}
         setQuickOpenVisible={setQuickOpenVisible} quickOpenMode={quickOpenMode} setQuickOpenMode={setQuickOpenMode}
         quickOpenQuery={quickOpenQuery} setQuickOpenQuery={setQuickOpenQuery} workspaceDir={workspaceDir}
-        availableColorThemes={availableColorThemes} settings={settings} update={update}
+        availableColorThemes={availableColorThemes} settings={settings} update={updateSetting}
         openFileFromExplorer={openFileFromExplorer}
       />
       <div className={`app theme-${theme}`} data-color-theme={selectedExtensionTheme ? "extension" : undefined} style={themeStyle}>
@@ -392,9 +396,9 @@ export default function App() {
             setDeleteTarget={setDeleteTarget} workspaceDir={workspaceDir} extensions={extensions}
             activeFile={activeTab?.path ?? null}
             extensionStatus={extensionStatus} extensionsDirectory={extensionsDirectory} enabledExtensions={enabledExtensions}
-            setEnabledExtensions={setEnabledExtensions} reloadExtensions={reloadExtensions} setExtensionStatus={setExtensionStatus}
+            setEnabledExtensions={updateEnabledExtensions} reloadExtensions={reloadExtensions} setExtensionStatus={setExtensionStatus}
             installingExtension={installingExtension} setInstallingExtension={setInstallingExtension}
-            settings={settings} update={update} availableColorThemes={availableColorThemes}
+            settings={settings} update={updateSetting} availableColorThemes={availableColorThemes}
           />
 
           <main className={`main ${bottomPanel ? "has-bottom-panel" : ""}`}>
