@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
+import { searchAPI } from "../lib/search";
 
 type Props = {
   theme: "dark" | "light";
   mode?: "files" | "themes";
-  files: { path: string; name: string }[];
+  root: string | null;
   themes?: { id: string; name: string; base: string; colors: Record<string, string> }[];
   activeThemeId?: string;
   onSelectTheme?: (id: string) => void;
@@ -16,7 +17,7 @@ type Props = {
 export default function QuickOpen({
   theme,
   mode = "files",
-  files,
+  root,
   themes = [],
   activeThemeId = "auto",
   onSelectTheme,
@@ -26,6 +27,22 @@ export default function QuickOpen({
 }: Props) {
   const query = externalQuery ?? "";
   const [selected, setSelected] = useState(0);
+  const [files, setFiles] = useState<{ path: string; name: string }[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setFiles([]);
+    if (!root || mode !== "files") return;
+
+    searchAPI.listFiles(root).then((entries) => {
+      if (!cancelled) setFiles(entries);
+    }).catch((error) => {
+      console.error("Quick Open could not list workspace files:", error);
+      if (!cancelled) setFiles([]);
+    });
+
+    return () => { cancelled = true; };
+  }, [root, mode]);
 
   // 🔍 filter files (live search)
   const results = useMemo(() => {
@@ -33,8 +50,13 @@ export default function QuickOpen({
 
     if (!q) return files;
 
-    return files.filter((f) => f.name.toLowerCase().includes(q));
-  }, [query, files]);
+    return files.filter((f) => {
+      const relativePath = root && f.path.startsWith(`${root.replace(/\/$/, "")}/`)
+        ? f.path.slice(root.replace(/\/$/, "").length + 1)
+        : f.path;
+      return f.name.toLowerCase().includes(q) || relativePath.toLowerCase().includes(q);
+    });
+  }, [query, files, root]);
   const themeResults = useMemo(() => {
     const q = query.trim().toLowerCase();
     return themes.filter((item) => !q || item.name.toLowerCase().includes(q));
@@ -123,6 +145,13 @@ export default function QuickOpen({
                   width="16"
                 />
                 <span className="quickopen-label">{file.name}</span>
+                <span className="quickopen-path">{(() => {
+                  const normalizedRoot = root?.replace(/\/$/, "");
+                  const relativePath = normalizedRoot && file.path.startsWith(`${normalizedRoot}/`)
+                    ? file.path.slice(normalizedRoot.length + 1)
+                    : file.path;
+                  return relativePath === file.name ? "" : relativePath.slice(0, Math.max(0, relativePath.length - file.name.length - 1));
+                })()}</span>
               </button>
             ))
           )}

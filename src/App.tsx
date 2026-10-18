@@ -194,6 +194,51 @@ export default function App() {
   tabsRef.current = tabs;
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
 
+  type WorkspaceSessionSnapshot = { tabs: Tab[]; activeTabId: string | null };
+  const [workspaceSessions] = useState<Record<string, WorkspaceSessionSnapshot>>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("beagle-workspace-sessions") ?? "{}");
+      return saved && typeof saved === "object" && !Array.isArray(saved) ? saved : {};
+    } catch {
+      return {};
+    }
+  });
+  const workspaceSessionsRef = useRef(workspaceSessions);
+
+  const switchWorkspace = useCallback((dir: string) => {
+    if (dir === workspaceDir) return;
+
+    const currentKey = workspaceDir ?? "__no_workspace__";
+    const nextSessions = {
+      ...workspaceSessionsRef.current,
+      [currentKey]: { tabs, activeTabId },
+    };
+    const target = nextSessions[dir] ?? { tabs: [], activeTabId: null };
+    nextSessions[dir] = target;
+    workspaceSessionsRef.current = nextSessions;
+    setTabs(target.tabs);
+    setActiveTabId(target.tabs.some((tab) => tab.id === target.activeTabId)
+      ? target.activeTabId
+      : (target.tabs[0]?.id ?? null));
+    setWorkspaceDir(dir);
+    setShowWelcome(target.tabs.length === 0);
+  }, [workspaceDir, tabs, activeTabId, setTabs, setActiveTabId, setWorkspaceDir, setShowWelcome]);
+
+  useEffect(() => {
+    if (booting) return;
+    const key = workspaceDir ?? "__no_workspace__";
+    const next = { ...workspaceSessionsRef.current, [key]: { tabs, activeTabId } };
+    workspaceSessionsRef.current = next;
+    const timer = window.setTimeout(() => {
+      try {
+        localStorage.setItem("beagle-workspace-sessions", JSON.stringify(next));
+      } catch (error) {
+        console.warn("Could not persist workspace sessions:", error);
+      }
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [workspaceDir, tabs, activeTabId, booting]);
+
   const activeTab = tabs.find((t) => t.id === activeTabId);
   activeTabRef.current = activeTab;
   useExtensionRuntime({
@@ -203,6 +248,7 @@ export default function App() {
     tabsRef,
     workspaceDirRef,
     editorRef,
+    editorInstance,
     setTabs,
     setExtensionCommands,
     setExtensionStatusItems,
@@ -250,6 +296,7 @@ export default function App() {
     openFileFromExplorer, changeLanguage, updateContent } = useWorkspaceFiles({
     tabs, setTabs, tabsRef, activeTab, setActiveTabId, setShowWelcome, workspaceDir, setWorkspaceDir,
     setFileTree, setRecentFolders, setSaveError, openLock, openFolderLock, saveDialogLock, activeModelRef,
+    switchWorkspace,
   });
 
   useAppEvents({
@@ -328,7 +375,7 @@ export default function App() {
         setCommandPaletteVisible={setCommandPaletteVisible} commandPaletteQuery={commandPaletteQuery}
         setCommandPaletteQuery={setCommandPaletteQuery} quickOpenVisible={quickOpenVisible}
         setQuickOpenVisible={setQuickOpenVisible} quickOpenMode={quickOpenMode} setQuickOpenMode={setQuickOpenMode}
-        quickOpenQuery={quickOpenQuery} setQuickOpenQuery={setQuickOpenQuery} fileTree={fileTree}
+        quickOpenQuery={quickOpenQuery} setQuickOpenQuery={setQuickOpenQuery} workspaceDir={workspaceDir}
         availableColorThemes={availableColorThemes} settings={settings} update={update}
         openFileFromExplorer={openFileFromExplorer}
       />
@@ -339,6 +386,7 @@ export default function App() {
             setSidebarView={setSidebarView} setSidebarVisible={setSidebarVisible} setSidebarWidth={setSidebarWidth}
             resizingRef={resizingRef} startX={startX} startWidth={startWidth} fileTree={fileTree}
             openFolder={openFolder} closeFolder={closeFolder} openFileFromExplorer={openFileFromExplorer}
+            recentFolders={recentFolders} openRecentFolder={openRecentFolder}
             reloadWorkspace={reloadWorkspace} createItem={createItem} setRenameError={setRenameError}
             setRenameTarget={setRenameTarget} setRenamePath={setRenamePath} setDeleteError={setDeleteError}
             setDeleteTarget={setDeleteTarget} workspaceDir={workspaceDir} extensions={extensions}

@@ -89,7 +89,7 @@ Example `manifest.json`:
 }
 ```
 
-An entry point exports `activate(api)`. The initial API supports `api.registerCommand({ id, title, run })`, `api.showMessage(message)`, and `api.getActiveDocument()` (returns the active document's name, path, language, content, and dirty state, or `null`). Registered commands appear in the command palette (`Cmd/Ctrl+Shift+P`). Return a cleanup function from `activate` to release resources when the extension is disabled or reloaded.
+An entry point exports `activate(api)`. The API supports command-palette and status-bar contributions, document and editor events, editor selection/cursor helpers, workspace search, and filesystem operations. Event registration returns a cleanup function, and resources are released when an extension is disabled or reloaded. Start with the [Hello World extension](examples/extensions/hello-world), then use the [Extension Development Guide](docs/extensions.md) for the API reference and working examples.
 
 See [`examples/extensions/hello-world`](examples/extensions/hello-world) for a working starter. Extensions execute JavaScript inside the editor and are **not sandboxed**; only install code you trust.
 

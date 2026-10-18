@@ -1,5 +1,5 @@
-pub mod fs;
 pub mod debug;
+pub mod fs;
 pub mod git;
 pub mod lsp;
 pub mod search;
@@ -18,7 +18,7 @@ use lsp::{
     lsp_change, lsp_code_actions, lsp_completion, lsp_definition, lsp_format, lsp_hover,
     lsp_is_initialized, lsp_open, lsp_save, lsp_signature_help, lsp_start, lsp_stop,
 };
-use search::search_workspace;
+use search::{list_files, search_workspace};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -129,6 +129,7 @@ pub fn run() {
             read_workspace,
             path_exists,
             search_workspace,
+            list_files,
             create_file,
             create_dir,
             delete_path,

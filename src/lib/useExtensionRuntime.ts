@@ -17,6 +17,7 @@ type Props = {
   tabsRef: MutableRefObject<Tab[]>;
   workspaceDirRef: MutableRefObject<string | null>;
   editorRef: MutableRefObject<any>;
+  editorInstance: any;
   setTabs: Dispatch<SetStateAction<Tab[]>>;
   setExtensionCommands: Dispatch<SetStateAction<Command[]>>;
   setExtensionStatusItems: Dispatch<SetStateAction<ExtensionStatusItem[]>>;
@@ -28,7 +29,7 @@ function snapshot(tab: Tab | undefined): Snapshot {
   return tab ? { id: tab.id, name: tab.name, path: tab.path, language: tab.language, content: tab.content, dirty: tab.dirty } : null;
 }
 
-export function useExtensionRuntime({ extensions, enabledExtensions, activeTabRef, tabsRef, workspaceDirRef, editorRef, setTabs, setExtensionCommands, setExtensionStatusItems, setExtensionStatus, activeDocumentListeners }: Props) {
+export function useExtensionRuntime({ extensions, enabledExtensions, activeTabRef, tabsRef, workspaceDirRef, editorRef, editorInstance, setTabs, setExtensionCommands, setExtensionStatusItems, setExtensionStatus, activeDocumentListeners }: Props) {
   useEffect(() => {
     let cancelled = false;
     const disposers = new Map<string, () => void>();
@@ -197,7 +198,7 @@ export function useExtensionRuntime({ extensions, enabledExtensions, activeTabRe
               return trackDisposable(() => activeDocumentListeners.current.delete(listener));
             },
             onDidChangeEditorSelection: (listener: (event: { text: string; startLineNumber: number; startColumn: number; endLineNumber: number; endColumn: number; isEmpty: boolean } | null) => void) => {
-              const editor = editorRef.current;
+              const editor = editorInstance ?? editorRef.current;
               if (typeof listener !== "function" || !editor?.onDidChangeCursorSelection) return () => {};
               const subscription = editor.onDidChangeCursorSelection(() => {
                 try {
@@ -216,7 +217,7 @@ export function useExtensionRuntime({ extensions, enabledExtensions, activeTabRe
               return trackDisposable(() => subscription.dispose());
             },
             onDidChangeTextDocument: (listener: (event: { document: Snapshot; changes: Array<{ range: unknown; rangeOffset: number; rangeLength: number; text: string }>; versionId: number; isUndoing: boolean; isRedoing: boolean }) => void) => {
-              const editor = editorRef.current;
+              const editor = editorInstance ?? editorRef.current;
               if (typeof listener !== "function" || !editor?.onDidChangeModelContent) return () => {};
               const subscription = editor.onDidChangeModelContent((event: any) => {
                 try {
@@ -252,5 +253,5 @@ export function useExtensionRuntime({ extensions, enabledExtensions, activeTabRe
     };
     setExtensionCommands([]); setExtensionStatusItems([]); void activate();
     return () => { cancelled = true; for (const dispose of disposers.values()) { try { dispose(); } catch (error) { console.error("Extension cleanup failed:", error); } } };
-  }, [extensions, enabledExtensions, activeTabRef, tabsRef, workspaceDirRef, editorRef, setTabs, setExtensionCommands, setExtensionStatusItems, setExtensionStatus, activeDocumentListeners]);
+  }, [extensions, enabledExtensions, activeTabRef, tabsRef, workspaceDirRef, editorRef, editorInstance, setTabs, setExtensionCommands, setExtensionStatusItems, setExtensionStatus, activeDocumentListeners]);
 }

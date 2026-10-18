@@ -256,6 +256,22 @@ These APIs are not confined to the open workspace. Extensions have no filesystem
 
 Searches file contents in the open workspace and returns matches with `path`, `line`, and `text` fields. Returns an empty array for a blank query and rejects if no workspace is open or a search fails.
 
+### Editor event subscriptions
+
+`api.onDidChangeActiveDocument(listener)`, `api.onDidChangeEditorSelection(listener)`, and `api.onDidChangeTextDocument(listener)` subscribe to editor changes and return a disposal function. Call that function when you no longer need the subscription; subscriptions are also released when the extension is deactivated or reloaded. Editor-specific subscriptions are attached when the editor instance is available, so extensions should register them during activation rather than trying to manage Monaco listeners themselves.
+
+```js
+export function activate(api) {
+  const stopListening = api.onDidChangeActiveDocument((document) => {
+    if (document) console.log(`Active document: ${document.name}`);
+  });
+
+  return () => stopListening();
+}
+```
+
+The active-document callback runs immediately with the current document snapshot, then again when the active tab changes. The selection callback receives the selected text and one-based range coordinates, or `null` when no selection/model is available. The text-document callback receives the document snapshot, Monaco content-change records, version ID, and undo/redo flags. These are event snapshots, not mutable editor objects.
+
 ### `api.getEditorSelection()`
 
 Returns `null` if there is no active editor model. Otherwise returns the selected `text`, `startLineNumber`, `startColumn`, `endLineNumber`, `endColumn`, and `isEmpty` fields.

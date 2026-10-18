@@ -97,7 +97,58 @@ pub fn fuzzy_find(root: String, query: String) -> Vec<FileEntry> {
 
 #[tauri::command]
 pub fn list_files(root: String) -> Vec<FileEntry> {
-    fuzzy_find(root, String::new())
+    let walker = WalkBuilder::new(root)
+        .hidden(false)
+        .git_ignore(true)
+        .build();
+    let mut files = walker
+        .flatten()
+        .filter(|entry| entry.path().is_file())
+        .map(|entry| FileEntry {
+            path: entry.path().to_string_lossy().into_owned(),
+            name: entry
+                .path()
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .into_owned(),
+        })
+        .collect::<Vec<_>>();
+    files.sort_by(|a, b| a.path.to_lowercase().cmp(&b.path.to_lowercase()));
+    files
+}
+
+#[cfg(test)]
+mod tests {
+    use super::list_files;
+    use std::fs;
+
+    #[test]
+    fn list_files_includes_nested_files_and_respects_gitignore() {
+        let root = tempfile::tempdir().unwrap();
+        let nested = root.path().join("src").join("components");
+        fs::create_dir_all(&nested).unwrap();
+        fs::write(nested.join("QuickOpen.tsx"), "export {}").unwrap();
+        fs::create_dir(root.path().join(".git")).unwrap();
+        fs::write(root.path().join(".gitignore"), "ignored/\n").unwrap();
+        fs::create_dir_all(root.path().join("ignored")).unwrap();
+        fs::write(root.path().join("ignored/secret.txt"), "ignored").unwrap();
+
+        let files = list_files(root.path().to_string_lossy().into_owned());
+        assert!(files.iter().any(|file| file.name == "QuickOpen.tsx"));
+        assert!(!files.iter().any(|file| file.path.contains("ignored")));
+    }
+
+    #[test]
+    fn list_files_does_not_truncate_large_workspaces() {
+        let root = tempfile::tempdir().unwrap();
+        for index in 0..125 {
+            fs::write(root.path().join(format!("file-{index:03}.txt")), "").unwrap();
+        }
+
+        let files = list_files(root.path().to_string_lossy().into_owned());
+        assert_eq!(files.len(), 125);
+    }
 }
 
 #[derive(Serialize, Clone)]

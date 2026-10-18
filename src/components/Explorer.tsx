@@ -14,6 +14,8 @@ type Props = {
   onCreateItem: (type: "file" | "folder", parentPath: string, name: string) => Promise<string | null>;
   onOpenFolder: () => void;
   onCloseFolder: () => void;
+  recentFolders: string[];
+  onOpenRecentFolder: (path: string) => void;
   onRename?: (path: string) => void;
   onDelete?: (path: string) => void;
   onRevealInFinder?: (path: string) => void;
@@ -85,6 +87,8 @@ export default function Explorer({
   onCreateItem,
   onOpenFolder,
   onCloseFolder,
+  recentFolders,
+  onOpenRecentFolder,
   onRename,
   onDelete,
   onRevealInFinder,
@@ -177,9 +181,26 @@ export default function Explorer({
   return (
     <aside className="explorer">
       <div className="explorer-title">
-        <span>EXPLORER</span>
+        <span>WORKSPACE</span>
 
         <div className="explorer-actions">
+          <select
+            className="explorer-workspace-picker"
+            aria-label="Switch workspace"
+            title={tree?.path ?? "Choose a workspace"}
+            value={tree?.path ?? ""}
+            onChange={(event) => {
+              if (event.target.value) onOpenRecentFolder(event.target.value);
+            }}
+          >
+            <option value={tree?.path ?? ""} disabled={!tree}>{tree?.name ?? "No workspace"}</option>
+            {recentFolders.filter((path) => path !== tree?.path).map((path) => (
+              <option key={path} value={path}>{path.split(/[/\\]/).filter(Boolean).pop() || path}</option>
+            ))}
+          </select>
+          <button className="explorer-action-btn" title="Open Workspace" aria-label="Open Workspace" onClick={onOpenFolder}>
+            <Icon icon="mdi:folder-open-outline" width="16" />
+          </button>
           {tree && <>
             <button
               className="explorer-action-btn"

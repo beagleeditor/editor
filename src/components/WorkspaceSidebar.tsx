@@ -21,6 +21,7 @@ type Props = {
   setSidebarWidth: Dispatch<SetStateAction<number>>;
   resizingRef: MutableRefObject<boolean>; startX: MutableRefObject<number>; startWidth: MutableRefObject<number>;
   fileTree: FileNode | null; openFolder: () => Promise<void>; closeFolder: () => void;
+  recentFolders: string[]; openRecentFolder: (path: string) => void;
   openFileFromExplorer: (path: string) => Promise<void>; reloadWorkspace: () => Promise<void>;
   createItem: (type: "file" | "folder", parentPath: string, name: string) => Promise<string | null>;
   setRenameError: Dispatch<SetStateAction<string | null>>; setRenameTarget: Dispatch<SetStateAction<string | null>>; setRenamePath: Dispatch<SetStateAction<string>>;
@@ -36,7 +37,7 @@ type Props = {
 
 export default function WorkspaceSidebar(props: Props) {
   const { sidebarView, sidebarVisible, sidebarWidth, setSidebarView, setSidebarVisible, setSidebarWidth,
-    resizingRef, startX, startWidth, fileTree, openFolder, closeFolder, openFileFromExplorer,
+    resizingRef, startX, startWidth, fileTree, openFolder, closeFolder, recentFolders, openRecentFolder, openFileFromExplorer,
     reloadWorkspace, createItem, setRenameError, setRenameTarget, setRenamePath, setDeleteError,
     setDeleteTarget, workspaceDir, activeFile, extensions, extensionStatus, extensionsDirectory, enabledExtensions,
     setEnabledExtensions, reloadExtensions, setExtensionStatus, installingExtension,
@@ -60,6 +61,8 @@ export default function WorkspaceSidebar(props: Props) {
                     tree={fileTree}
                     onOpenFolder={openFolder}
                     onCloseFolder={closeFolder}
+                    recentFolders={recentFolders}
+                    onOpenRecentFolder={openRecentFolder}
                     onOpenFile={openFileFromExplorer}
                     onReload={reloadWorkspace}
                     onCreateItem={createItem}

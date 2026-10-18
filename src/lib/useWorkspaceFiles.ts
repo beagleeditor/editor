@@ -29,12 +29,13 @@ type Options = {
   openFolderLock: MutableRefObject<boolean>;
   saveDialogLock: MutableRefObject<boolean>;
   activeModelRef: MutableRefObject<monaco.editor.ITextModel | null>;
+  switchWorkspace: (dir: string) => void;
 };
 
 export function useWorkspaceFiles({
   tabs, setTabs, tabsRef, activeTab, setActiveTabId, setShowWelcome,
   workspaceDir, setWorkspaceDir, setFileTree, setRecentFolders, setSaveError,
-  openLock, openFolderLock, saveDialogLock, activeModelRef,
+  openLock, openFolderLock, saveDialogLock, activeModelRef, switchWorkspace,
 }: Options) {
   const newFile = useCallback(() => {
     const id = crypto.randomUUID();
@@ -101,10 +102,10 @@ export function useWorkspaceFiles({
   }, [workspaceDir, setFileTree]);
 
   const openRecentFolder = useCallback((dir: string) => {
-    setWorkspaceDir(dir);
+    switchWorkspace(dir);
     setRecentFolders((previous) => [dir, ...previous.filter((path) => path !== dir)].slice(0, 8));
     setShowWelcome(false);
-  }, [setWorkspaceDir, setRecentFolders, setShowWelcome]);
+  }, [switchWorkspace, setRecentFolders, setShowWelcome]);
 
   const openFolder = useCallback(async () => {
     if (openFolderLock.current) return;
@@ -112,7 +113,7 @@ export function useWorkspaceFiles({
     try {
       const dir = await open({ directory: true });
       if (!dir || Array.isArray(dir)) return;
-      setWorkspaceDir(dir);
+      switchWorkspace(dir);
       setRecentFolders((previous) => [dir, ...previous.filter((path) => path !== dir)].slice(0, 8));
       setShowWelcome(false);
       const entries = await fsAPI.readDir(dir);
@@ -120,7 +121,7 @@ export function useWorkspaceFiles({
     } finally {
       openFolderLock.current = false;
     }
-  }, [openFolderLock, setWorkspaceDir, setRecentFolders, setShowWelcome, setFileTree]);
+  }, [openFolderLock, switchWorkspace, setRecentFolders, setShowWelcome, setFileTree]);
 
   const closeFolder = useCallback(() => {
     setWorkspaceDir(null);

@@ -4,8 +4,6 @@ import QuickOpen from "./QuickOpen";
 import CommandPalette, { type PaletteCommand } from "./CommandPalette";
 import type { useSettings } from "../lib/useSettings";
 import type { InstalledExtension } from "../lib/extensions";
-import type { WorkspaceFileNode } from "../lib/useWorkspaceFiles";
-import { flattenTree } from "../lib/editorUtils";
 
 type Theme = "dark" | "light";
 type Props = {
@@ -21,7 +19,7 @@ type Props = {
   setQuickOpenMode: Dispatch<SetStateAction<"files" | "themes">>;
   quickOpenQuery: string;
   setQuickOpenQuery: Dispatch<SetStateAction<string>>;
-  fileTree: WorkspaceFileNode | null;
+  workspaceDir: string | null;
   availableColorThemes: InstalledExtension[];
   settings: ReturnType<typeof useSettings>["settings"];
   update: ReturnType<typeof useSettings>["update"];
@@ -32,7 +30,7 @@ export default function AppChrome(props: Props) {
   const {
     theme, commands, commandPaletteVisible, setCommandPaletteVisible, commandPaletteQuery,
     setCommandPaletteQuery, quickOpenVisible, setQuickOpenVisible, quickOpenMode,
-    setQuickOpenMode, quickOpenQuery, setQuickOpenQuery, fileTree, availableColorThemes,
+    setQuickOpenMode, quickOpenQuery, setQuickOpenQuery, workspaceDir, availableColorThemes,
     settings, update, openFileFromExplorer,
   } = props;
 
@@ -45,7 +43,7 @@ export default function AppChrome(props: Props) {
       {quickOpenVisible && <QuickOpen
         theme={theme}
         mode={quickOpenMode}
-        files={flattenTree(fileTree)}
+        root={workspaceDir}
         themes={[
           {
             id: "auto",
