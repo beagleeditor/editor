@@ -1,3 +1,4 @@
+import { UiIcon } from "./CustomIcon";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -5,7 +6,7 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
 import { WebLinksAddon } from "@xterm/addon-web-links";
-import { ChevronDown, CircleStop, Columns2, Copy, Play, Plus, Search, Trash2, X } from "lucide-react";
+
 import "@xterm/xterm/css/xterm.css";
 
 type OutputEvent = { sessionId: number; stream: string; text: string };
@@ -162,15 +163,15 @@ export default function TerminalPanel({
     <header className="bottom-panel-header">
       <div className="bottom-panel-tabs"><strong>Terminal</strong>{sessions.map((session, index) => <button key={session.id} className={`terminal-tab ${session.id === activeId ? "selected" : ""}`} onClick={() => setActiveId(session.id)} title={`${session.cwd}\n${session.shell}`}>{`Terminal ${index + 1}`}<span className={`terminal-dot ${session.running ? "running" : ""}`} /></button>)}</div>
       <div className="terminal-actions">
-        <button className="panel-icon-button" onClick={() => setShowTasks((visible) => !visible)} title="Run task" aria-label="Run task"><Play size={14} /></button>
-        <button className="panel-icon-button" onClick={() => { setShowSearch((visible) => !visible); setTimeout(() => document.querySelector<HTMLInputElement>(".terminal-search-input")?.focus(), 0); }} title="Search terminal output" aria-label="Search terminal output"><Search size={14} /></button>
-        <button className="panel-icon-button" onClick={() => void copySelection()} title="Copy selection" aria-label="Copy selection"><Copy size={14} /></button>
-        <button className={`panel-icon-button ${split ? "active" : ""}`} onClick={() => setSplit((value) => !value)} disabled={sessions.length < 2} title="Toggle split terminal" aria-label="Toggle split terminal"><Columns2 size={14} /></button>
-        <button className="panel-icon-button" onClick={() => void createSession()} disabled={starting} title="New terminal" aria-label="New terminal"><Plus size={15} /></button>
-        <button className="panel-icon-button" onClick={() => { const terminal = terminalsRef.current.get(focusedId ?? activeId ?? -1); terminal?.clear(); terminal?.focus(); }} disabled={!active} title="Clear terminal" aria-label="Clear terminal"><Trash2 size={14} /></button>
-        <button className="panel-icon-button" onClick={() => active && void stopSession(active.id)} disabled={!active?.running} title="Stop shell" aria-label="Stop shell"><CircleStop size={15} /></button>
-        <button className="panel-icon-button" onClick={() => active && void closeSession(active.id)} disabled={!active} title="Close terminal" aria-label="Close terminal"><X size={15} /></button>
-        <button className="panel-icon-button" onClick={onClose} title="Hide panel" aria-label="Hide panel"><ChevronDown size={15} /></button>
+        <button className="panel-icon-button" onClick={() => setShowTasks((visible) => !visible)} title="Run task" aria-label="Run task"><UiIcon name="play" size={14} /></button>
+        <button className="panel-icon-button" onClick={() => { setShowSearch((visible) => !visible); setTimeout(() => document.querySelector<HTMLInputElement>(".terminal-search-input")?.focus(), 0); }} title="Search terminal output" aria-label="Search terminal output"><UiIcon name="search" size={14} /></button>
+        <button className="panel-icon-button" onClick={() => void copySelection()} title="Copy selection" aria-label="Copy selection"><UiIcon name="copy" size={14} /></button>
+        <button className={`panel-icon-button ${split ? "active" : ""}`} onClick={() => setSplit((value) => !value)} disabled={sessions.length < 2} title="Toggle split terminal" aria-label="Toggle split terminal"><UiIcon name="columns2" size={14} /></button>
+        <button className="panel-icon-button" onClick={() => void createSession()} disabled={starting} title="New terminal" aria-label="New terminal"><UiIcon name="plus" size={15} /></button>
+        <button className="panel-icon-button" onClick={() => { const terminal = terminalsRef.current.get(focusedId ?? activeId ?? -1); terminal?.clear(); terminal?.focus(); }} disabled={!active} title="Clear terminal" aria-label="Clear terminal"><UiIcon name="trash2" size={14} /></button>
+        <button className="panel-icon-button" onClick={() => active && void stopSession(active.id)} disabled={!active?.running} title="Stop shell" aria-label="Stop shell"><UiIcon name="circle-stop" size={15} /></button>
+        <button className="panel-icon-button" onClick={() => active && void closeSession(active.id)} disabled={!active} title="Close terminal" aria-label="Close terminal"><UiIcon name="x" size={15} /></button>
+        <button className="panel-icon-button" onClick={onClose} title="Hide panel" aria-label="Hide panel"><UiIcon name="chevron-down" size={15} /></button>
       </div>
     </header>
     {showTasks && <div className="terminal-task-menu" role="menu" aria-label="Quick tasks">
@@ -179,11 +180,11 @@ export default function TerminalPanel({
       {!tasks.length && <p>No common tasks detected. Add scripts to package.json or use Cargo.toml, pubspec.yaml, pyproject.toml, or Makefile.</p>}
     </div>}
     {showSearch && <form className="terminal-search-row" onSubmit={(event) => { event.preventDefault(); search("next"); }}>
-      <Search size={13} />
+      <UiIcon name="search" size={13} />
       <input className="terminal-search-input" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Find in terminal output…" onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); search(event.shiftKey ? "previous" : "next"); } if (event.key === "Escape") setShowSearch(false); }} />
       <button type="button" onClick={() => search("previous")} title="Previous match">↑</button>
       <button type="button" onClick={() => search("next")} title="Next match">↓</button>
-      <button type="button" onClick={() => { setSearchQuery(""); setShowSearch(false); }} title="Close search"><X size={13} /></button>
+      <button type="button" onClick={() => { setSearchQuery(""); setShowSearch(false); }} title="Close search"><UiIcon name="x" size={13} /></button>
     </form>}
     <div className={`terminal-session-info ${active?.running ? "" : "exited"}`}><span className={`terminal-dot ${active?.running ? "running" : ""}`} />{active?.cwd ?? cwd ?? "No workspace"}<span className="terminal-shell-name">{active?.shell ?? "Shell"}</span>{active?.running ? " · Running" : active ? " · Exited" : " · No session"}</div>
     <div className={`terminal-surface ${split && secondaryId !== null ? "split" : ""}`}>
@@ -203,7 +204,7 @@ export default function TerminalPanel({
       })}
       {!active && <div className="terminal-welcome">Create a terminal to start an interactive shell. Run tasks, search output, and open source locations directly from compiler errors.</div>}
     </div>
-    {error && <div className="terminal-error" role="status">{error}<button onClick={() => setError("")} aria-label="Dismiss error"><X size={13} /></button></div>}
+    {error && <div className="terminal-error" role="status">{error}<button onClick={() => setError("")} aria-label="Dismiss error"><UiIcon name="x" size={13} /></button></div>}
     {copied && <span className="terminal-copy-status">Selection copied</span>}
   </section>;
 }

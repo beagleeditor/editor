@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { fsAPI, FileNode } from "../lib/fs";
-import { Icon } from "@iconify/react";
 import { listen } from "@tauri-apps/api/event";
+import { CustomIcon, FileIcon, UiIcon } from "./CustomIcon";
 
 /* -------------------------------------------------------
    TYPES
@@ -20,61 +20,6 @@ type Props = {
   onDelete?: (path: string) => void;
   onRevealInFinder?: (path: string) => void;
 };
-
-/* -------------------------------------------------------
-   ICON RESOLVER 
-   We are currently relying or VS Code Icons. We will have
-   our own icons in future.
-------------------------------------------------------- */
-
-export function FileIcon({ name, isDir }: { name: string; isDir: boolean }) {
-  if (isDir) {
-    return <Icon icon="vscode-icons:default-folder" width="16" height="16" />;
-  }
-
-  const ext = name.split(".").pop()?.toLowerCase();
-
-  switch (ext) {
-    case "rs":
-      return <Icon icon="vscode-icons:file-type-rust" width="16" />;
-
-    case "py":
-      return <Icon icon="vscode-icons:file-type-python" width="16" />;
-
-    case "ts":
-      return <Icon icon="vscode-icons:file-type-typescript-official" width="16" />;
-
-    case "tsx":
-      return <Icon icon="vscode-icons:file-type-reactts" width="16" />;
-
-    case "js":
-      return <Icon icon="vscode-icons:file-type-js-official" width="16" />;
-
-    case "jsx":
-      return <Icon icon="vscode-icons:file-type-reactjs" width="16" />;
-
-    case "json":
-      return <Icon icon="vscode-icons:file-type-json" width="16" />;
-
-    case "md":
-      return <Icon icon="vscode-icons:file-type-markdown" width="16" />;
-
-    case "html":
-      return <Icon icon="vscode-icons:file-type-html" width="16" />;
-
-    case "css":
-      return <Icon icon="vscode-icons:file-type-css" width="16" />;
-
-    case "png":
-    case "jpg":
-    case "jpeg":
-    case "svg":
-      return <Icon icon="vscode-icons:file-type-image" width="16" />;
-
-    default:
-      return <Icon icon="vscode-icons:default-file" width="16" />;
-  }
-}
 
 /* -------------------------------------------------------
    MAIN EXPLORER
@@ -199,7 +144,7 @@ export default function Explorer({
             ))}
           </select>
           <button className="explorer-action-btn" title="Open Workspace" aria-label="Open Workspace" onClick={onOpenFolder}>
-            <Icon icon="mdi:folder-open-outline" width="16" />
+            <UiIcon name="folder-open" />
           </button>
           {tree && <>
             <button
@@ -208,14 +153,14 @@ export default function Explorer({
               aria-label="Close Folder"
               onClick={onCloseFolder}
             >
-              <Icon icon="mdi:folder-remove-outline" width="16" />
+              <UiIcon name="x" />
             </button>
             <button
               className="explorer-action-btn"
               title="New File"
               onClick={() => beginCreate("file", tree?.path)}
             >
-              <Icon icon="mdi:file-plus-outline" width="16" />
+              <UiIcon name="file-plus2" />
             </button>
 
             <button
@@ -223,7 +168,7 @@ export default function Explorer({
               title="New Folder"
               onClick={() => beginCreate("folder", tree?.path)}
             >
-              <Icon icon="mdi:folder-plus-outline" width="16" />
+              <UiIcon name="folder-plus" />
             </button>
 
             <button
@@ -233,7 +178,7 @@ export default function Explorer({
               await onReload?.();
             }}
             >
-              <Icon icon="mdi:refresh" width="16" />
+              <UiIcon name="refresh-cw" />
             </button>
           </>}
         </div>
@@ -267,16 +212,16 @@ export default function Explorer({
               {createError && <span className="explorer-create-error" role="alert">{createError}</span>}
             </div>
             <button className="explorer-create-confirm" title="Create" aria-label="Create" disabled={creatingItem} onClick={() => void submitCreate()}>
-              <Icon icon="mdi:check" width="15" />
+              <UiIcon name="check" size={15} />
             </button>
             <button className="explorer-create-cancel" title="Cancel" aria-label="Cancel" disabled={creatingItem} onClick={cancelCreate}>
-              <Icon icon="mdi:close" width="15" />
+              <UiIcon name="x" size={15} />
             </button>
           </div>
         )}
         {!tree ? (
           <div className="explorer-empty">
-            <Icon icon="mdi:folder-open-outline" width="34" />
+            <CustomIcon name="folder-open" size={34} />
             <strong>No folder open</strong>
             <span>Open a project folder to browse files and manage your workspace.</span>
             <button onClick={onOpenFolder}>Open Folder</button>
@@ -513,20 +458,8 @@ function TreeNode({
           });
         }}
       >
-        <Icon
-          icon={open ? "mdi:chevron-down" : "mdi:chevron-right"}
-          width="14"
-          style={{ marginRight: 2, opacity: 0.8 }}
-        />
-        <Icon
-          icon={
-            open
-              ? "vscode-icons:default-folder-opened"
-              : "vscode-icons:default-folder"
-          }
-          width="16"
-          style={{ marginRight: 4 }}
-        />
+        <UiIcon name={open ? "chevron-down" : "chevron-right"} size={14} style={{ marginRight: 2, opacity: 0.8 }} />
+        <FileIcon name={node.name} isDir size={16} />
         <span>{node.name}</span>
 
         {loading && (

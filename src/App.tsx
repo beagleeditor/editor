@@ -1,6 +1,7 @@
+import { UiIcon } from "./components/CustomIcon";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as monaco from "monaco-editor";
-import { ShieldAlert } from "lucide-react";
+
 
 import { loader } from "@monaco-editor/react";
 
@@ -169,13 +170,24 @@ export default function App() {
   /* ---------------- FILE SYSTEM ---------------- */
 
   const [workspaceDir, setWorkspaceDir] = useState<string | null>(null);
-  const [trustedWorkspaces] = useState<Record<string, boolean>>(() => {
+  const [trustedWorkspaces, setTrustedWorkspaces] = useState<Record<string, boolean>>(() => {
     try {
       const saved: unknown = JSON.parse(localStorage.getItem("beagle-trusted-workspaces") ?? "{}");
       return saved && typeof saved === "object" && !Array.isArray(saved) ? saved as Record<string, boolean> : {};
     } catch { return {}; }
   });
   const workspaceTrusted = workspaceDir !== null && trustedWorkspaces[workspaceDir] === true;
+  const [trustDialogOpen, setTrustDialogOpen] = useState(false);
+  const setCurrentWorkspaceTrust = useCallback((trusted: boolean) => {
+    if (!workspaceDir) return;
+    setTrustedWorkspaces((current) => {
+      const next = { ...current, [workspaceDir]: trusted };
+      try { localStorage.setItem("beagle-trusted-workspaces", JSON.stringify(next)); }
+      catch (error) { console.warn("Could not persist workspace trust:", error); }
+      return next;
+    });
+    setTrustDialogOpen(false);
+  }, [workspaceDir]);
   useEffect(() => {
     if (booting || !workspaceDir || workspaceTrusted) return;
     const seenKey = `beagle-safe-mode-notice:${workspaceDir}`;
@@ -300,7 +312,7 @@ export default function App() {
     activeDocumentListeners,
     // JavaScript runs only in the opaque-origin, CSP-restricted sandbox. This
     // flag still disables activation when Safe Mode is explicitly requested.
-    allowExtensions: true,
+    allowExtensions: workspaceTrusted,
   });
   useEffect(() => {
     const snapshot = getDocumentSnapshot(activeTabRef.current);
@@ -310,6 +322,7 @@ export default function App() {
     }
   }, [activeTabId]);
   const isMarkdown = activeTab?.language === "markdown";
+  const isSvg = activeTab?.name.toLowerCase().endsWith(".svg") ?? false;
   const activeModelUri = useMemo(
     () => (activeTab ? getModelUriForTab(activeTab).toString() : null),
     [activeTab],
@@ -429,11 +442,27 @@ export default function App() {
       />
       {safeModeNotice && <div className="safe-mode-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSafeModeNotice(null); }}>
         <section className="safe-mode-dialog" role="dialog" aria-modal="true" aria-labelledby="safe-mode-title">
-          <div className="safe-mode-dialog-icon"><ShieldAlert size={22} /></div>
+          <div className="safe-mode-dialog-icon"><UiIcon name="shield-alert" size={22} /></div>
           <h2 id="safe-mode-title">Safe mode is enabled</h2>
           <p>This workspace is opened in Safe Mode. BeagleEditor blocks terminal commands, program execution, debugging, and language-server startup until the workspace is explicitly trusted. This helps protect your computer from unfamiliar projects and extensions. Review the folder before running code from it.</p>
           <div className="safe-mode-dialog-path" title={safeModeNotice}>{safeModeNotice}</div>
           <button onClick={() => setSafeModeNotice(null)} autoFocus>Got it</button>
+        </section>
+      </div>}
+      {trustDialogOpen && workspaceDir && <div className="safe-mode-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setTrustDialogOpen(false); }}>
+        <section className="safe-mode-dialog" role="dialog" aria-modal="true" aria-labelledby="workspace-trust-title">
+          <div className="safe-mode-dialog-icon"><UiIcon name={workspaceTrusted ? "shield-check" : "shield-alert"} size={22} /></div>
+          <h2 id="workspace-trust-title">{workspaceTrusted ? "Manage workspace trust" : "Trust this workspace?"}</h2>
+          <p>{workspaceTrusted
+            ? "This folder is trusted. BeagleEditor can run terminal commands, programs, debuggers, language servers, and enabled JavaScript extensions for this workspace. Revoke trust to return to Restricted Mode."
+            : "Only trust this folder if you know where it came from and have reviewed its contents. Trust enables terminal commands, program execution, debugging, language servers, and enabled JavaScript extensions. Opening the folder alone does not require trusting it."}</p>
+          <div className="safe-mode-dialog-path" title={workspaceDir}>{workspaceDir}</div>
+          <div className="workspace-trust-actions">
+            <button className="workspace-trust-secondary" onClick={() => setTrustDialogOpen(false)}>Cancel</button>
+            {workspaceTrusted
+              ? <button onClick={() => setCurrentWorkspaceTrust(false)}>Revoke Trust</button>
+              : <button onClick={() => setCurrentWorkspaceTrust(true)}>Trust Workspace</button>}
+          </div>
         </section>
       </div>}
       <div className={`app theme-${theme}`} data-color-theme={selectedExtensionTheme ? "extension" : undefined} style={themeStyle}>
@@ -482,7 +511,7 @@ export default function App() {
               saveError={saveError} setSaveError={setSaveError}
             />
             <EditorSurface
-              showAbout={showAbout} setShowAbout={setShowAbout} activeTab={activeTab} isMarkdown={isMarkdown}
+              showAbout={showAbout} setShowAbout={setShowAbout} activeTab={activeTab} isMarkdown={isMarkdown} isSvg={isSvg}
               previewMode={previewMode} activeModelUri={activeModelUri} editorTheme={editorTheme} settings={settings}
               editorRef={editorRef} previewRef={previewRef} setEditorInstance={setEditorInstance}
               syncEditorScroll={syncEditorScroll} syncPreviewScroll={syncPreviewScroll}
@@ -518,6 +547,7 @@ export default function App() {
           extensionItems={extensionStatusItems}
           workspaceDir={workspaceDir}
           workspaceTrusted={workspaceTrusted}
+          onWorkspaceTrustClick={() => setTrustDialogOpen(true)}
           notifications={notifications}
           onDismissNotification={(id) => setNotifications((current) => current.filter((notification) => notification.id !== id))}
           onClearNotifications={() => setNotifications([])}

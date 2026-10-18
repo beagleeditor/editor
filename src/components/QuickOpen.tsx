@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Icon } from "@iconify/react";
 import { searchAPI } from "../lib/search";
+import { FileIcon } from "./CustomIcon";
 
 type Props = {
   theme: "dark" | "light";
@@ -139,11 +139,7 @@ export default function QuickOpen({
                   onClose();
                 }}
               >
-                <Icon
-                  className="quickopen-icon"
-                  icon="vscode-icons:default-file"
-                  width="16"
-                />
+                <span className="quickopen-icon"><FileIcon name={file.name} isDir={false} /></span>
                 <span className="quickopen-label">{file.name}</span>
                 <span className="quickopen-path">{(() => {
                   const normalizedRoot = root?.replace(/\/$/, "");

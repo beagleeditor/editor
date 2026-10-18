@@ -108,8 +108,8 @@ export function useEditorModel({
   }, [setDiagnosticsByPath]);
 
   useEffect(() => {
-    setPreviewMode(activeTab?.language === "markdown" ? "split" : "edit");
-  }, [activeTabId, activeTab?.language, setPreviewMode]);
+    setPreviewMode(activeTab?.language === "markdown" || activeTab?.name.toLowerCase().endsWith(".svg") ? "split" : "edit");
+  }, [activeTabId, activeTab?.language, activeTab?.name, setPreviewMode]);
 
   return { activeModelRef, syncActiveModel };
 }

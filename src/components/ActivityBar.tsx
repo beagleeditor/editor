@@ -1,4 +1,5 @@
-import { Files, Search, GitBranch, Settings, Puzzle, Bug } from "lucide-react";
+import { UiIcon } from "./CustomIcon";
+
 
 type SidebarView = "files" | "search" | "git" | "run" | "extensions" | "settings";
 
@@ -17,7 +18,7 @@ export default function ActivityBar({ active, onSelect }: Props) {
         aria-label="Explorer"
         aria-pressed={active === "files"}
       >
-        <Files size={18} />
+        <UiIcon name="files" size={18} />
       </button>
 
       <button
@@ -27,7 +28,7 @@ export default function ActivityBar({ active, onSelect }: Props) {
         aria-label="Run and Debug"
         aria-pressed={active === "run"}
       >
-        <Bug size={18} />
+        <UiIcon name="bug" size={18} />
       </button>
 
       <button
@@ -37,7 +38,7 @@ export default function ActivityBar({ active, onSelect }: Props) {
         aria-label="Search"
         aria-pressed={active === "search"}
       >
-        <Search size={18} />
+        <UiIcon name="search" size={18} />
       </button>
 
       <button
@@ -47,7 +48,7 @@ export default function ActivityBar({ active, onSelect }: Props) {
         aria-label="Source Control"
         aria-pressed={active === "git"}
       >
-        <GitBranch size={18} />
+        <UiIcon name="git-branch" size={18} />
       </button>
 
       <button
@@ -57,7 +58,7 @@ export default function ActivityBar({ active, onSelect }: Props) {
         aria-label="Extensions"
         aria-pressed={active === "extensions"}
       >
-        <Puzzle size={18} />
+        <UiIcon name="puzzle" size={18} />
       </button>
 
       <div className="activity-spacer" />
@@ -69,7 +70,7 @@ export default function ActivityBar({ active, onSelect }: Props) {
         aria-label="Settings"
         aria-pressed={active === "settings"}
       >
-        <Settings size={18} />
+        <UiIcon name="settings" size={18} />
       </button>
     </div>
   );

@@ -14,7 +14,7 @@ import { ensureLanguageProviders } from "../lib/lspProviders";
 type Settings = ReturnType<typeof useSettings>["settings"];
 type Props = {
   showAbout: boolean; setShowAbout: Dispatch<SetStateAction<boolean>>;
-  activeTab: Tab | undefined; isMarkdown: boolean; previewMode: "edit" | "preview" | "split";
+  activeTab: Tab | undefined; isMarkdown: boolean; isSvg: boolean; previewMode: "edit" | "preview" | "split";
   activeModelUri: string | null; editorTheme: string; settings: Settings;
   editorRef: MutableRefObject<any>; previewRef: MutableRefObject<HTMLDivElement | null>;
   setEditorInstance: Dispatch<SetStateAction<any>>;
@@ -26,7 +26,7 @@ type Props = {
 };
 
 export default function EditorSurface(props: Props) {
-  const { showAbout, setShowAbout, activeTab, isMarkdown, previewMode, activeModelUri, editorTheme, settings,
+  const { showAbout, setShowAbout, activeTab, isMarkdown, isSvg, previewMode, activeModelUri, editorTheme, settings,
     editorRef, previewRef, setEditorInstance, syncEditorScroll, syncPreviewScroll,
     addFormatAction, syncActiveModel, updateContent, openFile, newFile, openFolder, recentFolders, openRecentFolder } = props;
   return (
@@ -41,12 +41,12 @@ export default function EditorSurface(props: Props) {
                 recentFolders={recentFolders}
                 onOpenRecentFolder={openRecentFolder}
               />
-            ) : isMarkdown && previewMode !== "edit" ? (
+            ) : (isMarkdown || isSvg) && previewMode !== "edit" ? (
               <div
                 className="markdown-split"
                 style={{ display: "flex", height: "100%" }}
               >
-                {isMarkdown &&
+                {(isMarkdown || isSvg) &&
                   (previewMode === "preview" || previewMode === "split") && (
                     <div style={{ flex: 1 }}>
                       <Editor
@@ -95,11 +95,21 @@ export default function EditorSurface(props: Props) {
                   <div
                     ref={previewRef}
                     onScroll={syncPreviewScroll}
+                    className={isSvg ? "svg-preview" : undefined}
                     style={{ flex: 1, padding: 16, overflow: "auto" }}
                   >
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {activeTab?.content ?? ""}
-                    </ReactMarkdown>
+                    {isSvg ? (
+                      <img
+                        className="svg-preview-image"
+                        alt={`Preview of ${activeTab?.name ?? "SVG image"}`}
+                        draggable={false}
+                        src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(activeTab?.content ?? "")}`}
+                      />
+                    ) : (
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {activeTab?.content ?? ""}
+                      </ReactMarkdown>
+                    )}
                   </div>
                 )}
               </div>

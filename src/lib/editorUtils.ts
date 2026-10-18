@@ -55,11 +55,25 @@ export function colorThemeStyle(themeData: monaco.editor.IStandaloneThemeData | 
 }
 
 export function detectLanguage(filename: string): string {
-  const ext = filename.split(".").pop()?.toLowerCase();
+  const basename = filename.split(/[\\/]/).pop()?.toLowerCase() ?? filename.toLowerCase();
+  if (/^(claude|agents|readme|contributing|changelog|changes|code_of_conduct|security)(\.md|\.mdx)?$/.test(basename)) return "markdown";
+  if (/^(license|copying|notice)(\..+)?$/.test(basename)) return "plaintext";
+  if (["package-lock.json", "npm-shrinkwrap.json"].includes(basename)) return "json";
+  if (["pnpm-lock.yaml", "\.yarnrc.yml"].includes(basename)) return "yaml";
+  if (["cargo.lock", "gemfile.lock", "poetry.lock", "pdm.lock", "uv.lock"].includes(basename)) return "toml";
+  if (["yarn.lock", "composer.lock", "mix.lock"].includes(basename)) return "yaml";
+  if (["dockerfile", "containerfile", "makefile", "justfile"].includes(basename)) return "shell";
+  if ([".bashrc", ".zshrc", ".profile", ".bash_profile", ".zprofile"].includes(basename)) return "shell";
+  const ext = basename.includes(".") ? basename.split(".").pop() : basename;
 
   switch (ext) {
     case "rs":
       return "rust";
+    case "nix":
+      return "nix";
+    case "pl":
+    case "pm":
+      return "perl";
     case "py":
       return "python";
     case "js":
@@ -106,6 +120,43 @@ export function detectLanguage(filename: string): string {
       return "kotlin";
     case "swift":
       return "swift";
+    case "dart":
+      return "dart";
+    case "vue":
+      return "html";
+    case "svelte":
+    case "astro":
+      return "html";
+    case "sh":
+    case "bash":
+    case "zsh":
+    case "fish":
+      return "shell";
+    case "toml":
+      return "toml";
+    case "xml":
+    case "svg":
+      return "xml";
+    case "sql":
+      return "sql";
+    case "graphql":
+    case "gql":
+      return "graphql";
+    case "ps1":
+      return "powershell";
+    case "ex":
+    case "exs":
+      return "elixir";
+    case "hs":
+      return "haskell";
+    case "scala":
+      return "scala";
+    case "clj":
+    case "cljs":
+      return "clojure";
+    case "tf":
+    case "hcl":
+      return "hcl";
     default:
       return "plaintext";
   }

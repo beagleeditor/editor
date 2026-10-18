@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { FileIcon } from "./Explorer";
+import { FileIcon } from "./CustomIcon";
 
 export type Tab = {
   id: string;

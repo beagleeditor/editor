@@ -1,4 +1,5 @@
-import { AlertCircle, AlertTriangle, Info, X } from "lucide-react";
+import { UiIcon } from "./CustomIcon";
+
 
 export type EditorProblem = {
   path: string;
@@ -27,18 +28,18 @@ export default function ProblemsPanel({ problems, onSelect, onClose }: Props) {
       <header className="bottom-panel-header">
         <div className="bottom-panel-tabs"><strong>Problems</strong><span className="panel-count">{problems.length}</span></div>
         <div className="problems-summary">
-          <span><AlertCircle size={13} /> {errors}</span>
-          <span><AlertTriangle size={13} /> {warnings}</span>
-          <button className="panel-icon-button" onClick={onClose} title="Close panel" aria-label="Close panel"><X size={15} /></button>
+          <span><UiIcon name="alert-circle" size={13} /> {errors}</span>
+          <span><UiIcon name="alert-triangle" size={13} /> {warnings}</span>
+          <button className="panel-icon-button" onClick={onClose} title="Close panel" aria-label="Close panel"><UiIcon name="x" size={15} /></button>
         </div>
       </header>
       <div className="problems-list">
         {problems.length === 0 ? (
-          <div className="panel-empty"><Info size={17} /><span>No problems detected in open files.</span></div>
+          <div className="panel-empty"><UiIcon name="info" size={17} /><span>No problems detected in open files.</span></div>
         ) : problems.map((problem, index) => {
           const name = problem.path.split(/[/\\]/).pop() || problem.path;
           return <button className="problem-row" key={`${problem.path}:${problem.line}:${problem.column}:${problem.message}:${index}`} onClick={() => onSelect(problem)} title={`${problem.path}:${problem.line}:${problem.column}`}>
-            {problem.severity === 1 ? <AlertCircle className="problem-error" size={15} /> : problem.severity === 2 ? <AlertTriangle className="problem-warning" size={15} /> : <Info className="problem-info" size={15} />}
+            {problem.severity === 1 ? <UiIcon name="alert-circle" className="problem-error" size={15} /> : problem.severity === 2 ? <UiIcon name="alert-triangle" className="problem-warning" size={15} /> : <UiIcon name="info" className="problem-info" size={15} />}
             <span className="problem-message">{problem.message}<small>{problem.source || problem.code || "Language server"}</small></span>
             <span className="problem-location">{name} ({problem.line}, {problem.column})</span>
           </button>;

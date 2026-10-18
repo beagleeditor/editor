@@ -1,7 +1,8 @@
+import { UiIcon } from "./CustomIcon";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { Bug, CircleStop, Play, RotateCcw, StepForward, Pause } from "lucide-react";
+
 
 type RunOutput = { sessionId: number; stream: string; text: string };
 type DebugEvent = { sessionId: number; event: any };
@@ -146,21 +147,21 @@ export default function RunDebugPanel({ root, activeFile }: { root: string | nul
   };
 
   return <section className="run-debug-panel">
-    <div className="sc-title"><span>RUN AND DEBUG</span><button title="Use active file as program" disabled={!activeFile} onClick={() => update("program", activeFile ?? "")}><RotateCcw size={14} /></button></div>
+    <div className="sc-title"><span>RUN AND DEBUG</span><button title="Use active file as program" disabled={!activeFile} onClick={() => update("program", activeFile ?? "")}><UiIcon name="rotate-ccw" size={14} /></button></div>
     {!root ? <p className="sc-muted">Open a workspace to run or debug a program.</p> : <>
       <div className="run-debug-config">
         <label>Program / executable<input value={config.program} onChange={(event) => update("program", event.target.value)} placeholder="python3, cargo, ./target/debug/app…" /></label>
         <label>Arguments <span>(one per line)</span><textarea value={config.args} onChange={(event) => update("args", event.target.value)} placeholder={activeFile ?? "--help"} rows={3} /></label>
         <label>Working directory<input value={config.cwd} onChange={(event) => update("cwd", event.target.value)} placeholder={root} /></label>
-        <div className="run-debug-actions"><button disabled={busy || runId !== null || !config.program.trim()} onClick={() => void run()}><Play size={14} /> Run</button><button disabled={busy || !config.program.trim() || debugId !== null} onClick={() => void debug()}><Bug size={14} /> Debug</button></div>
+        <div className="run-debug-actions"><button disabled={busy || runId !== null || !config.program.trim()} onClick={() => void run()}><UiIcon name="play" size={14} /> Run</button><button disabled={busy || !config.program.trim() || debugId !== null} onClick={() => void debug()}><UiIcon name="bug" size={14} /> Debug</button></div>
         <details><summary>Debug adapter settings</summary>
           <label>Adapter executable<input value={config.adapter} onChange={(event) => update("adapter", event.target.value)} placeholder="lldb-dap" /></label>
           <label>Adapter arguments <span>(one per line)</span><textarea value={config.adapterArgs} onChange={(event) => update("adapterArgs", event.target.value)} rows={2} /></label>
           <label>Breakpoint lines for active file<input value={config.breakpoints} onChange={(event) => update("breakpoints", event.target.value)} placeholder="8, 14, 27" /></label>
         </details>
       </div>
-      {debugId !== null && <div className="run-debug-controls"><span>{debugStatus}</span><button title="Continue" onClick={() => void request("continue", { threadId })}><Play size={13} /></button><button title="Step over" onClick={() => void request("next", { threadId })}><StepForward size={13} /></button><button title="Pause" onClick={() => void request("pause", { threadId })}><Pause size={13} /></button><button title="Stop debugging" onClick={() => void stopDebug()}><CircleStop size={13} /></button></div>}
-      {runId !== null && <div className="run-debug-controls"><span>Program running</span><button title="Stop program" onClick={() => void stopRun()}><CircleStop size={13} /></button></div>}
+      {debugId !== null && <div className="run-debug-controls"><span>{debugStatus}</span><button title="Continue" onClick={() => void request("continue", { threadId })}><UiIcon name="play" size={13} /></button><button title="Step over" onClick={() => void request("next", { threadId })}><UiIcon name="step-forward" size={13} /></button><button title="Pause" onClick={() => void request("pause", { threadId })}><UiIcon name="pause" size={13} /></button><button title="Stop debugging" onClick={() => void stopDebug()}><UiIcon name="circle-stop" size={13} /></button></div>}
+      {runId !== null && <div className="run-debug-controls"><span>Program running</span><button title="Stop program" onClick={() => void stopRun()}><UiIcon name="circle-stop" size={13} /></button></div>}
       <div className="run-debug-output-tabs"><button className={activeOutput === "run" ? "selected" : ""} onClick={() => setActiveOutput("run")}>Run output</button><button className={activeOutput === "debug" ? "selected" : ""} onClick={() => setActiveOutput("debug")}>Debug console</button></div>
       <pre className="run-debug-output" ref={outputRef}>{activeOutput === "run" ? runOutput || "Run output will appear here." : debugOutput || "Debug adapter output will appear here."}</pre>
       {error && <p className="sc-error" role="status">{error}</p>}
