@@ -183,6 +183,7 @@ pub fn git_status(root: String) -> Result<GitStatus, String> {
 #[tauri::command]
 pub fn git_init(root: String) -> Result<(), String> {
     validate_root(&root)?;
+    crate::workspace_security::require_trusted_workspace(&root)?;
     run_git(&root, &["init"])?;
     Ok(())
 }
@@ -190,6 +191,7 @@ pub fn git_init(root: String) -> Result<(), String> {
 #[tauri::command]
 pub fn git_stage(root: String, path: String) -> Result<(), String> {
     validate_root(&root)?;
+    crate::workspace_security::require_trusted_workspace(&root)?;
     run_git(&root, &["add", "--", &path])?;
     Ok(())
 }
@@ -197,6 +199,7 @@ pub fn git_stage(root: String, path: String) -> Result<(), String> {
 #[tauri::command]
 pub fn git_unstage(root: String, path: String) -> Result<(), String> {
     validate_root(&root)?;
+    crate::workspace_security::require_trusted_workspace(&root)?;
     run_git(&root, &["restore", "--staged", "--", &path])?;
     Ok(())
 }
@@ -204,6 +207,7 @@ pub fn git_unstage(root: String, path: String) -> Result<(), String> {
 #[tauri::command]
 pub fn git_commit(root: String, message: String) -> Result<String, String> {
     validate_root(&root)?;
+    crate::workspace_security::require_trusted_workspace(&root)?;
     if message.trim().is_empty() {
         return Err("Enter a commit message first.".into());
     }
@@ -214,6 +218,7 @@ pub fn git_commit(root: String, message: String) -> Result<String, String> {
 #[tauri::command]
 pub fn git_push(root: String) -> Result<String, String> {
     validate_root(&root)?;
+    crate::workspace_security::require_trusted_workspace(&root)?;
     run_git(&root, &["push"])?;
     Ok("Push completed successfully.".into())
 }
@@ -221,6 +226,7 @@ pub fn git_push(root: String) -> Result<String, String> {
 #[tauri::command]
 pub fn git_pull(root: String) -> Result<String, String> {
     validate_root(&root)?;
+    crate::workspace_security::require_trusted_workspace(&root)?;
     run_git(&root, &["pull", "--ff-only"])?;
     Ok("Pull completed successfully.".into())
 }

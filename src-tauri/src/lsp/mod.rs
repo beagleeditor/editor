@@ -51,6 +51,8 @@ pub fn lsp_start(app: tauri::AppHandle, language: String) -> Result<(), String> 
         workspace.clone().unwrap_or_else(workspace_root)
     };
 
+    crate::workspace_security::require_trusted_workspace(&workspace)?;
+
     println!("Using workspace: {}", workspace);
 
     {

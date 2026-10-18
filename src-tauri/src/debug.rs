@@ -40,6 +40,7 @@ pub fn run_start(
     args: Vec<String>,
     cwd: String,
 ) -> Result<u32, String> {
+    crate::workspace_security::require_trusted_workspace(&cwd)?;
     if program.trim().is_empty() {
         return Err("Enter a program or executable to run.".into());
     }
@@ -133,6 +134,7 @@ pub fn debug_start(
     adapter_args: Vec<String>,
     cwd: String,
 ) -> Result<u32, String> {
+    crate::workspace_security::require_trusted_workspace(&cwd)?;
     if adapter.trim().is_empty() {
         return Err("Choose a Debug Adapter executable.".into());
     }

@@ -202,6 +202,13 @@ pub fn terminal_start(
     cols: Option<u16>,
     rows: Option<u16>,
 ) -> Result<TerminalSessionInfo, String> {
+    if let Some(path) = cwd.as_deref() {
+        crate::workspace_security::require_trusted_workspace(path)?;
+    } else {
+        return Err(
+            "Safe Mode blocked terminal startup because no trusted workspace was supplied.".into(),
+        );
+    }
     let working_dir = cwd
         .filter(|path| Path::new(path).is_dir())
         .or_else(|| std::env::var("HOME").ok())

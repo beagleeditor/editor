@@ -1,0 +1,8 @@
+{
+  "id": "notification-demo",
+  "name": "Notification Demo",
+  "version": "1.0.0",
+  "description": "Demonstrates permission-gated in-app notifications.",
+  "main": "main.js",
+  "permissions": ["notifications"]
+}

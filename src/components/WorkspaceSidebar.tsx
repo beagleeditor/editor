@@ -30,6 +30,7 @@ type Props = {
   activeFile: string | null;
   enabledExtensions: Record<string, boolean>; setEnabledExtensions: Dispatch<SetStateAction<Record<string, boolean>>>;
   reloadExtensions: () => Promise<void>; setExtensionStatus: Dispatch<SetStateAction<string>>;
+  onRevokeExtensionPermissions: (id: string) => void;
   installingExtension: boolean; setInstallingExtension: Dispatch<SetStateAction<boolean>>;
   settings: ReturnType<typeof useSettings>["settings"]; update: ReturnType<typeof useSettings>["update"];
   settingsPageSettings: ReturnType<typeof useSettings>["settings"];
@@ -43,7 +44,7 @@ export default function WorkspaceSidebar(props: Props) {
     resizingRef, startX, startWidth, fileTree, openFolder, closeFolder, recentFolders, openRecentFolder, openFileFromExplorer,
     reloadWorkspace, createItem, setRenameError, setRenameTarget, setRenamePath, setDeleteError,
     setDeleteTarget, workspaceDir, activeFile, extensions, extensionStatus, extensionsDirectory, enabledExtensions,
-    setEnabledExtensions, reloadExtensions, setExtensionStatus, installingExtension,
+    setEnabledExtensions, reloadExtensions, setExtensionStatus, onRevokeExtensionPermissions, installingExtension,
     setInstallingExtension, settings, update, settingsPageSettings, updateSettingsPage, settingsScope, onSettingsScopeChange, availableColorThemes } = props;
   return (
     <>
@@ -115,6 +116,7 @@ export default function WorkspaceSidebar(props: Props) {
                     directory={extensionsDirectory}
                     enabled={enabledExtensions}
                     onToggle={(id, enabled) => setEnabledExtensions((current) => ({ ...current, [id]: enabled }))}
+                    onRevokePermissions={onRevokeExtensionPermissions}
                     onReload={() => void reloadExtensions()}
                     onRemove={(id, name) => {
                       if (!window.confirm(`Remove “${name}” and its installed files?`)) return;

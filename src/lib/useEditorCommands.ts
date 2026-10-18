@@ -10,6 +10,9 @@ type Options = {
   closeFolder: () => void;
   saveFile: () => void | Promise<void>;
   formatActiveDocument: () => void | Promise<void>;
+  reloadWorkspace: () => void | Promise<void>;
+  editorInstance: any;
+  setPreviewMode: Dispatch<SetStateAction<"edit" | "preview" | "split">>;
   openSettings: () => void;
   openAbout: () => void;
   setSidebarView: Dispatch<SetStateAction<"files" | "search" | "git" | "run" | "extensions" | "settings">>;
@@ -25,7 +28,7 @@ type Options = {
 export function useEditorCommands(options: Options): PaletteCommand[] {
   const {
     extensionCommands, newFile, openFile, openFolder, closeFolder, saveFile,
-    formatActiveDocument, openSettings, openAbout, setSidebarView, setSidebarVisible,
+    formatActiveDocument, reloadWorkspace, editorInstance, setPreviewMode, openSettings, openAbout, setSidebarView, setSidebarVisible,
     setBottomPanel, setTerminalPanelCreated, setQuickOpenMode, setQuickOpenQuery,
     setQuickOpenVisible, setCommandPaletteVisible,
   } = options;
@@ -37,19 +40,27 @@ export function useEditorCommands(options: Options): PaletteCommand[] {
     { id: "workspace.close", label: "Close Folder", category: "Workspace", run: closeFolder },
     { id: "file.save", label: "Save File", category: "File", shortcut: "⌘ S", run: saveFile },
     { id: "editor.format", label: "Format Document", category: "Editor", shortcut: "⌘ ⇧ I", run: formatActiveDocument },
+    { id: "workspace.reload", label: "Refresh Workspace Files", category: "Workspace", run: reloadWorkspace },
+    { id: "editor.toggle-word-wrap", label: "Toggle Word Wrap", category: "Editor", run: () => { if (editorInstance) editorInstance.updateOptions({ wordWrap: editorInstance.getRawOptions().wordWrap === "on" ? "off" : "on" }); } },
+    { id: "editor.toggle-minimap", label: "Toggle Minimap", category: "Editor", run: () => { if (editorInstance) editorInstance.updateOptions({ minimap: { enabled: !editorInstance.getRawOptions().minimap?.enabled } }); } },
+    { id: "editor.fold-all", label: "Fold All", category: "Editor", run: () => editorInstance?.getAction("editor.foldAll")?.run() },
+    { id: "editor.unfold-all", label: "Unfold All", category: "Editor", run: () => editorInstance?.getAction("editor.unfoldAll")?.run() },
+    { id: "editor.toggle-preview", label: "Cycle Editor Preview Mode", category: "Editor", run: () => setPreviewMode((mode) => mode === "edit" ? "split" : mode === "split" ? "preview" : "edit") },
     { id: "view.explorer", label: "Show Explorer", category: "View", run: () => { setSidebarView("files"); setSidebarVisible(true); } },
     { id: "view.search", label: "Show Search", category: "View", run: () => { setSidebarView("search"); setSidebarVisible(true); } },
     { id: "view.source-control", label: "Show Source Control", category: "View", run: () => { setSidebarView("git"); setSidebarVisible(true); } },
     { id: "view.run-debug", label: "Show Run and Debug", category: "View", run: () => { setSidebarView("run"); setSidebarVisible(true); } },
     { id: "view.problems", label: "Show Problems", category: "View", shortcut: "⌘ ⇧ M", run: () => setBottomPanel("problems") },
+    { id: "view.toggle-problems", label: "Toggle Problems Panel", category: "View", run: () => setBottomPanel((panel) => panel === "problems" ? null : "problems") },
     { id: "view.terminal", label: "Show Terminal", category: "View", shortcut: "⌃ `", run: () => { setTerminalPanelCreated(true); setBottomPanel("terminal"); } },
+    { id: "view.toggle-terminal", label: "Toggle Terminal Panel", category: "View", run: () => { setTerminalPanelCreated(true); setBottomPanel((panel) => panel === "terminal" ? null : "terminal"); } },
     { id: "view.extensions", label: "Show Extensions", category: "View", run: () => { setSidebarView("extensions"); setSidebarVisible(true); } },
     { id: "view.settings", label: "Open Settings", category: "Preferences", shortcut: "⌘ ,", run: openSettings },
     { id: "preferences.color-themes", label: "Color Themes", category: "Preferences", run: () => { setQuickOpenMode("themes"); setQuickOpenQuery(""); setQuickOpenVisible(true); setCommandPaletteVisible(false); } },
     { id: "help.about", label: "About BeagleEditor", category: "Help", run: openAbout },
     { id: "view.toggle-sidebar", label: "Toggle Sidebar", category: "View", run: () => setSidebarVisible((visible) => !visible) },
     ...extensionCommands,
-  ], [extensionCommands, newFile, openFile, openFolder, closeFolder, saveFile, formatActiveDocument,
+  ], [extensionCommands, newFile, openFile, openFolder, closeFolder, saveFile, formatActiveDocument, reloadWorkspace, editorInstance, setPreviewMode,
     openSettings, openAbout, setSidebarView, setSidebarVisible, setBottomPanel, setTerminalPanelCreated,
     setQuickOpenMode, setQuickOpenQuery, setQuickOpenVisible, setCommandPaletteVisible]);
 }

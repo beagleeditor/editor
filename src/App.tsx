@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as monaco from "monaco-editor";
+import { ShieldAlert } from "lucide-react";
 
 import { loader } from "@monaco-editor/react";
 
@@ -7,6 +8,7 @@ import { Store } from "@tauri-apps/plugin-store";
 
 import EditorTabs from "./components/EditorTabs";
 import StatusBar from "./components/StatusBar";
+import { type AppNotification } from "./components/NotificationCenter";
 
 
 import "./App.css";
@@ -32,6 +34,7 @@ import { useEditorCommands } from "./lib/useEditorCommands";
 import { useEditorFormatting } from "./lib/useEditorFormatting";
 import { useAppearance } from "./lib/useAppearance";
 import { useWorkspacePreferences } from "./lib/useWorkspacePreferences";
+import { invoke } from "@tauri-apps/api/core";
 import type { InstalledExtension } from "./lib/extensions";
 import type { WorkspaceFileNode } from "./lib/useWorkspaceFiles";
 
@@ -118,6 +121,10 @@ export default function App() {
 
   const [showAbout, setShowAbout] = useState(false);
   const [extensionCommands, setExtensionCommands] = useState<ExtensionCommand[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [extensionPermissionRevision, setExtensionPermissionRevision] = useState(0);
+  const [safeModeNotice, setSafeModeNotice] = useState<string | null>(null);
+  const pushNotification = useCallback((notification: AppNotification) => setNotifications((current) => [...current, notification].slice(-100)), []);
   const [extensionStatusItems, setExtensionStatusItems] = useState<Array<{ id: string; extensionId: string; text: string; tooltip?: string; alignment: "left" | "right"; priority: number; run?: () => void | Promise<void> }>>([]);
   const { extensions, extensionStatus, setExtensionStatus, extensionsDirectory, installingExtension,
     setInstallingExtension, enabledExtensions: globalEnabledExtensions, setEnabledExtensions: setGlobalEnabledExtensions, reloadExtensions } = useExtensionManager();
@@ -162,6 +169,31 @@ export default function App() {
   /* ---------------- FILE SYSTEM ---------------- */
 
   const [workspaceDir, setWorkspaceDir] = useState<string | null>(null);
+  const [trustedWorkspaces] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved: unknown = JSON.parse(localStorage.getItem("beagle-trusted-workspaces") ?? "{}");
+      return saved && typeof saved === "object" && !Array.isArray(saved) ? saved as Record<string, boolean> : {};
+    } catch { return {}; }
+  });
+  const workspaceTrusted = workspaceDir !== null && trustedWorkspaces[workspaceDir] === true;
+  useEffect(() => {
+    if (booting || !workspaceDir || workspaceTrusted) return;
+    const seenKey = `beagle-safe-mode-notice:${workspaceDir}`;
+    if (localStorage.getItem(seenKey) === "shown") return;
+    localStorage.setItem(seenKey, "shown");
+    setSafeModeNotice(workspaceDir);
+  }, [workspaceDir, workspaceTrusted, booting]);
+  useEffect(() => {
+    if (!workspaceDir) return;
+    void (async () => {
+      try {
+        await invoke("set_workspace", { path: workspaceDir });
+        await invoke("set_workspace_trust", { path: workspaceDir, trusted: workspaceTrusted });
+      } catch (error) {
+        console.error("Could not update native workspace security:", error);
+      }
+    })();
+  }, [workspaceDir, workspaceTrusted]);
   const [settingsScope, setSettingsScope] = useState<"global" | "workspace">("workspace");
   const { settings, updateSetting, getSettingsForWorkspace, updateSettingForWorkspace, enabledExtensions, updateEnabledExtensions } = useWorkspacePreferences(
     workspaceDir, globalSettings, updateGlobalSetting, globalEnabledExtensions, setGlobalEnabledExtensions,
@@ -263,7 +295,12 @@ export default function App() {
     setExtensionCommands,
     setExtensionStatusItems,
     setExtensionStatus,
+    onNotification: pushNotification,
+    permissionRevision: extensionPermissionRevision,
     activeDocumentListeners,
+    // JavaScript runs only in the opaque-origin, CSP-restricted sandbox. This
+    // flag still disables activation when Safe Mode is explicitly requested.
+    allowExtensions: true,
   });
   useEffect(() => {
     const snapshot = getDocumentSnapshot(activeTabRef.current);
@@ -365,6 +402,7 @@ export default function App() {
 
   const commands = useEditorCommands({
     extensionCommands, newFile, openFile, openFolder, closeFolder, saveFile, formatActiveDocument,
+    reloadWorkspace, editorInstance, setPreviewMode,
     openSettings, openAbout, setSidebarView, setSidebarVisible, setBottomPanel, setTerminalPanelCreated,
     setQuickOpenMode, setQuickOpenQuery, setQuickOpenVisible, setCommandPaletteVisible,
   });
@@ -389,6 +427,15 @@ export default function App() {
         availableColorThemes={availableColorThemes} settings={settings} update={updateSetting}
         openFileFromExplorer={openFileFromExplorer}
       />
+      {safeModeNotice && <div className="safe-mode-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSafeModeNotice(null); }}>
+        <section className="safe-mode-dialog" role="dialog" aria-modal="true" aria-labelledby="safe-mode-title">
+          <div className="safe-mode-dialog-icon"><ShieldAlert size={22} /></div>
+          <h2 id="safe-mode-title">Safe mode is enabled</h2>
+          <p>This workspace is opened in Safe Mode. BeagleEditor blocks terminal commands, program execution, debugging, and language-server startup until the workspace is explicitly trusted. This helps protect your computer from unfamiliar projects and extensions. Review the folder before running code from it.</p>
+          <div className="safe-mode-dialog-path" title={safeModeNotice}>{safeModeNotice}</div>
+          <button onClick={() => setSafeModeNotice(null)} autoFocus>Got it</button>
+        </section>
+      </div>}
       <div className={`app theme-${theme}`} data-color-theme={selectedExtensionTheme ? "extension" : undefined} style={themeStyle}>
         <div className="workspace">
           <WorkspaceSidebar
@@ -403,6 +450,15 @@ export default function App() {
             activeFile={activeTab?.path ?? null}
             extensionStatus={extensionStatus} extensionsDirectory={extensionsDirectory} enabledExtensions={enabledExtensions}
             setEnabledExtensions={updateEnabledExtensions} reloadExtensions={reloadExtensions} setExtensionStatus={setExtensionStatus}
+            onRevokeExtensionPermissions={(id) => {
+              let grants: Record<string, string[]> = {};
+              try { grants = JSON.parse(localStorage.getItem("beagle-extension-permissions") ?? "{}"); } catch { grants = {}; }
+              if (Array.isArray(grants[id]) && grants[id].length === 0) delete grants[id];
+              else grants[id] = [];
+              localStorage.setItem("beagle-extension-permissions", JSON.stringify(grants));
+              setExtensionPermissionRevision((revision) => revision + 1);
+              setExtensionStatus(`Permissions updated for ${id}. If revoked, the extension is restarted without its capabilities; click again to review its request.`);
+            }}
             installingExtension={installingExtension} setInstallingExtension={setInstallingExtension}
             settings={settings} update={updateSetting} availableColorThemes={availableColorThemes}
             settingsPageSettings={settingsPageSettings} updateSettingsPage={updateSettingsPage}
@@ -460,6 +516,11 @@ export default function App() {
             setBottomPanel((panel) => panel === "terminal" ? null : "terminal");
           }}
           extensionItems={extensionStatusItems}
+          workspaceDir={workspaceDir}
+          workspaceTrusted={workspaceTrusted}
+          notifications={notifications}
+          onDismissNotification={(id) => setNotifications((current) => current.filter((notification) => notification.id !== id))}
+          onClearNotifications={() => setNotifications([])}
         />
       </div>
     </div>

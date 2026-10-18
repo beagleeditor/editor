@@ -2,7 +2,7 @@ import { Check, ExternalLink, FolderPlus, GitBranch, Puzzle, RefreshCw, Trash2 }
 import { useState } from "react";
 
 type Extension = {
-  manifest: { id: string; name: string; version: string; description?: string; type?: string };
+  manifest: { id: string; name: string; version: string; description?: string; type?: string; permissions?: string[] };
   path: string;
 };
 
@@ -16,11 +16,12 @@ type Props = {
   onInstall: () => void;
   onInstallFromGit: (url: string) => void;
   onRemove: (id: string, name: string) => void;
+  onRevokePermissions: (id: string) => void;
   installing: boolean;
   onOpenDirectory: () => void;
 };
 
-export default function ExtensionsView({ extensions, status, directory, enabled, onToggle, onReload, onInstall, onInstallFromGit, onRemove, installing, onOpenDirectory }: Props) {
+export default function ExtensionsView({ extensions, status, directory, enabled, onToggle, onReload, onInstall, onInstallFromGit, onRemove, onRevokePermissions, installing, onOpenDirectory }: Props) {
   const [gitUrl, setGitUrl] = useState("");
   return (
     <section className="extensions-view">
@@ -67,12 +68,13 @@ export default function ExtensionsView({ extensions, status, directory, enabled,
               <button className={`extension-toggle ${isEnabled ? "enabled" : ""}`} onClick={() => onToggle(manifest.id, !isEnabled)} aria-pressed={isEnabled} title={isEnabled ? "Disable extension" : "Enable extension"}>
                 {isEnabled ? <><Check size={13} /> Enabled</> : "Enable"}
               </button>
+              {(manifest.permissions?.length ?? 0) > 0 && <button className="extensions-icon-button" onClick={() => onRevokePermissions(manifest.id)} title="Revoke extension permissions" aria-label={`Revoke permissions for ${manifest.name}`}>Revoke permissions</button>}
               <button className="extensions-icon-button extension-remove-button" onClick={() => onRemove(manifest.id, manifest.name)} title={`Remove ${manifest.name}`} aria-label={`Remove ${manifest.name}`}><Trash2 size={14} /></button>
             </article>;
           })}
         </div>
       )}
-      <footer className="extensions-footer">Only install extensions you trust. JavaScript extensions execute inside the editor; color themes use JSON data only.</footer>
+      <footer className="extensions-footer">Only install extensions you trust. JavaScript runs in an isolated sandbox; requested capabilities require approval. Color themes use JSON data only.</footer>
     </section>
   );
 }

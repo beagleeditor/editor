@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import * as monaco from "monaco-editor";
 import { AlertCircle, AlertTriangle, CircleAlert, Terminal } from "lucide-react";
 import type { ExtensionStatusItem } from "../lib/useExtensionRuntime";
+import NotificationCenter, { type AppNotification } from "./NotificationCenter";
 
 type Props = {
   fileName: string | null;
@@ -19,6 +20,11 @@ type Props = {
   onShowProblems: () => void;
   onShowTerminal: () => void;
   extensionItems: ExtensionStatusItem[];
+  workspaceDir: string | null;
+  workspaceTrusted: boolean;
+  notifications: AppNotification[];
+  onDismissNotification: (id: string) => void;
+  onClearNotifications: () => void;
 };
 
 export default function StatusBar({
@@ -37,6 +43,11 @@ export default function StatusBar({
   onShowProblems,
   onShowTerminal,
   extensionItems,
+  workspaceDir,
+  workspaceTrusted,
+  notifications,
+  onDismissNotification,
+  onClearNotifications,
 }: Props) {
   const [position, setPosition] = useState({ line: 1, column: 1 });
   useEffect(() => {
@@ -64,6 +75,7 @@ export default function StatusBar({
   return (
     <footer className="status-bar" aria-label="Editor status">
       <div className="status-left">
+        {workspaceDir && !workspaceTrusted && <span className="status-safe-mode" title="Code execution is blocked for this workspace">Safe Mode</span>}
         {extensionItems.filter((item) => item.alignment === "left").sort((a, b) => b.priority - a.priority).map((item) => (
           <button key={item.id} className="status-extension-item" title={item.tooltip ?? item.text} onClick={() => void item.run?.()}>{item.text}</button>
         ))}
@@ -86,6 +98,7 @@ export default function StatusBar({
       </div>
 
       <div className="status-right">
+        <NotificationCenter notifications={notifications} onDismiss={onDismissNotification} onClear={onClearNotifications} />
         {extensionItems.filter((item) => item.alignment === "right").sort((a, b) => b.priority - a.priority).map((item) => (
           <button key={item.id} className="status-extension-item" title={item.tooltip ?? item.text} onClick={() => void item.run?.()}>{item.text}</button>
         ))}

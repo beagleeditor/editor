@@ -55,6 +55,7 @@ Fields:
 | `main` | No | Entry filename. Defaults to `main.js`. The entry file must be directly inside the extension folder. |
 | `type` | No | Set to `"theme"` for a JSON-only color theme. Omit it for a JavaScript extension. |
 | `theme` | Theme only | Theme data filename. Defaults to `theme.json`; the file must be directly inside the extension folder. |
+| `permissions` | No | Optional list of capabilities, such as `["notifications"]`. Each requested capability requires user approval. Unknown capabilities are ignored and never granted. |
 
 The manifest must be valid JSON. BeagleEditor skips folders with missing or invalid manifests, blank required fields, invalid IDs, duplicate IDs, or missing/unreadable entry files. Extension IDs may contain ASCII letters, numbers, dots, hyphens, and underscores. Use a unique `id` for every extension; command IDs are prefixed with it.
 
@@ -194,7 +195,26 @@ export function activate(api) {
 
 ### `api.showMessage(message)`
 
-Displays a native web-view alert prefixed with the extension name. The value is converted to a string. Use it for simple messages; it is not a custom notification or status-bar API.
+Displays a simple alert prefixed with the extension name. The value is converted to a string. For non-blocking messages, use the permission-gated `showNotification` API below.
+
+### `api.showNotification({ title, body })`
+
+Adds a notification to BeagleEditor's notification center and shows a top-left toast. `title` is required; `body` is optional. Titles and bodies are length-limited by the host. The extension must declare `"notifications"` in `manifest.json`; the first notification request prompts the user to allow or deny that extension. The decision is stored per extension. Notifications remain in the in-app history until dismissed or cleared. This API does not use the operating system's notification service.
+
+```js
+export function activate(api) {
+  return api.registerCommand({
+    id: "notify",
+    title: "Send Example Notification",
+    run: () => api.showNotification({
+      title: "Build reminder",
+      body: "Remember to run the test suite before committing.",
+    }),
+  });
+}
+```
+
+The notification permission prompt is per extension and appears when the extension first attempts to send a notification. Approval is saved locally for that extension; denial is also remembered to avoid repeatedly prompting. **Revoke permissions** immediately restarts the extension without its grants. Click the same control again to clear the remembered decision and review the request again. Revoking permission prevents notification messages from being delivered by the host.
 
 ### `api.getActiveDocument()`
 
@@ -226,7 +246,7 @@ Read UTF-8 text from a path or write UTF-8 text to a path. Both return promises;
 
 ### Additional filesystem APIs
 
-These APIs use BeagleEditor's filesystem backend and return promises:
+These APIs are planned capabilities, but are not exposed by the current sandbox bridge. They are listed here to describe the former API shape; extensions must not assume filesystem access is available:
 
 - `api.readDirectory(path)` — returns entries with `name`, `path`, and `is_dir` fields for the requested directory.
 - `api.pathExists(path)` — resolves to `true` if the path exists, otherwise `false`.
@@ -250,7 +270,7 @@ export async function activate(api) {
 }
 ```
 
-These APIs are not confined to the open workspace. Extensions have no filesystem permission prompts or sandbox, so only use paths you trust and avoid destructive operations without explicit user intent.
+Filesystem access is not currently granted to JavaScript extensions. The sandbox does not expose these methods, and an extension should feature-detect APIs before using them.
 
 ### `api.searchWorkspace(query)`
 
@@ -446,13 +466,15 @@ The current API is intentionally small. It does **not** currently provide:
 - Custom editor actions or custom sidebar panels.
 - Range-based editor edits, an editor save-command API, or filesystem watcher events.
 - A stable public API guarantee across releases.
-- A sandbox or permission system. Extensions execute in the editor web view and should be treated as trusted code.
+- A user-facing capability grant flow. Filesystem, OS, workspace-content, and editor-mutation APIs are deliberately not exposed yet.
 
 Entry files are loaded as JavaScript modules from source text. Relative imports from an extension's entry file are not supported by this loading approach. For now, keep an extension self-contained in its entry file and use browser-standard JavaScript features available in the editor's web view.
 
 ## 8. Security
 
-**Only install extensions whose source you trust.** Enabled extensions execute JavaScript in the same editor web view as BeagleEditor. They are not sandboxed and may be able to access data or capabilities available to the application. Review the source before enabling an extension, especially one obtained from another person or website. Do not treat an extension folder as safe merely because its manifest looks valid.
+**Security status:** JavaScript extensions execute inside a dedicated sandboxed iframe with an opaque origin (`sandbox="allow-scripts"`, without `allow-same-origin`). Its CSP denies network connections, external resources, forms, and base-URL changes. Extension code is never imported into the privileged app WebView. The bridge validates the iframe source and extension ID. The only granted capability currently implemented is `notifications`, which requires explicit per-extension approval. Tauri, filesystem, OS, workspace contents, and editor mutation APIs are not exposed. This is intentional default-deny behavior, not a claim that browser sandboxing defeats every WebView vulnerability or resource-exhaustion attack. Keep BeagleEditor and its WebView runtime updated; JSON-only themes remain data-only.
+
+See [`notification-demo`](../examples/extensions/notification-demo) and [`notification-status`](../examples/extensions/notification-status) for installable JavaScript examples that request notification permission.
 
 ## 9. Troubleshooting
 

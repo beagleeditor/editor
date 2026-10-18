@@ -18,6 +18,8 @@ pub struct ExtensionManifest {
     #[serde(rename = "type")]
     pub extension_type: Option<String>,
     pub theme: Option<String>,
+    #[serde(default)]
+    pub permissions: Option<Vec<String>>,
 }
 
 #[derive(Serialize, Clone)]

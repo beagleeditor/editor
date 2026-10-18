@@ -1,0 +1,8 @@
+{
+  "id": "notification-status",
+  "name": "Notification Status",
+  "version": "1.0.0",
+  "description": "Adds a status-bar action that sends a useful notification.",
+  "main": "main.js",
+  "permissions": ["notifications"]
+}

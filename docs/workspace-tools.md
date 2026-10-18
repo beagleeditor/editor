@@ -2,6 +2,12 @@
 
 BeagleEditor groups project navigation and common development tools around the current workspace folder.
 
+## Workspace Safe Mode and trust
+
+New workspaces start in **Safe Mode**. Reading and editing files remains available, but starting a terminal, running or debugging programs, starting language servers, and mutating Git operations are blocked by native-side checks until you explicitly trust that workspace. Use the **Safe Mode** control in the status bar to review the folder path and trust it only if you control it or have reviewed its contents. Trust is remembered per workspace path on this machine; click **Trusted Workspace** to revoke trust. Execution is checked again by the Rust command handlers, so hiding or bypassing a UI control is not sufficient to bypass these checks.
+
+JavaScript extensions run in a sandboxed iframe with an opaque origin and a restrictive CSP. The iframe has no Tauri bridge and no network access. The current bridge permits command/status registration and messages only; filesystem, OS, workspace-content, and editor-mutation capabilities are not granted. A per-capability approval UI is still pending, so extensions requiring those APIs may not work yet. JSON-only color themes remain data-only. This browser sandbox is a meaningful boundary, but it is not an OS-process sandbox and cannot promise protection from every WebView vulnerability or CPU-exhaustion attack.
+
 ## Explorer
 
 Open a folder to populate the Explorer. Select a file to open it. Use the Explorer actions to create a file or folder, refresh the listing, or close the workspace. When creating a file or folder inline, enter a name and confirm; Escape cancels the operation. Rename and delete actions are available on eligible items.

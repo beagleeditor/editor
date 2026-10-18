@@ -4,6 +4,7 @@ pub mod git;
 pub mod lsp;
 pub mod search;
 pub mod terminal;
+pub mod workspace_security;
 
 use tauri::{
     menu::{Menu, MenuItem, Submenu},
@@ -114,6 +115,7 @@ pub fn run() {
             git::git_push,
             git::git_pull,
             terminal::terminal_start,
+            workspace_security::set_workspace_trust,
             terminal::terminal_list_tasks,
             terminal::terminal_write,
             terminal::terminal_resize,
@@ -137,6 +139,7 @@ pub fn run() {
             reveal_in_finder,
             start_watch,
             lsp_start,
+            lsp::set_workspace,
             lsp_stop,
             lsp_open,
             lsp_change,
