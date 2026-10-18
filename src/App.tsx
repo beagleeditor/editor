@@ -162,9 +162,15 @@ export default function App() {
   /* ---------------- FILE SYSTEM ---------------- */
 
   const [workspaceDir, setWorkspaceDir] = useState<string | null>(null);
-  const { settings, updateSetting, enabledExtensions, updateEnabledExtensions } = useWorkspacePreferences(
+  const [settingsScope, setSettingsScope] = useState<"global" | "workspace">("workspace");
+  const { settings, updateSetting, getSettingsForWorkspace, updateSettingForWorkspace, enabledExtensions, updateEnabledExtensions } = useWorkspacePreferences(
     workspaceDir, globalSettings, updateGlobalSetting, globalEnabledExtensions, setGlobalEnabledExtensions,
   );
+  const settingsPageWorkspaceDir = settingsScope === "workspace" ? workspaceDir : null;
+  const settingsPageSettings = getSettingsForWorkspace(settingsPageWorkspaceDir);
+  const updateSettingsPage = useCallback(<K extends keyof typeof globalSettings>(key: K, value: (typeof globalSettings)[K]) => {
+    updateSettingForWorkspace(settingsPageWorkspaceDir, key, value);
+  }, [settingsPageWorkspaceDir, updateSettingForWorkspace, globalSettings]);
   const { theme, editorTheme, themeStyle, availableColorThemes, selectedExtensionTheme } =
     useAppearance(settings, extensions, enabledExtensions);
 
@@ -399,6 +405,8 @@ export default function App() {
             setEnabledExtensions={updateEnabledExtensions} reloadExtensions={reloadExtensions} setExtensionStatus={setExtensionStatus}
             installingExtension={installingExtension} setInstallingExtension={setInstallingExtension}
             settings={settings} update={updateSetting} availableColorThemes={availableColorThemes}
+            settingsPageSettings={settingsPageSettings} updateSettingsPage={updateSettingsPage}
+            settingsScope={settingsScope} onSettingsScopeChange={setSettingsScope}
           />
 
           <main className={`main ${bottomPanel ? "has-bottom-panel" : ""}`}>

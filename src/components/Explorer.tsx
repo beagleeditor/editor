@@ -181,7 +181,7 @@ export default function Explorer({
   return (
     <aside className="explorer">
       <div className="explorer-title">
-        <span>WORKSPACE</span>
+        <span className="explorer-title-label">WORKSPACE</span>
 
         <div className="explorer-actions">
           <select

@@ -7,6 +7,8 @@ type Props = {
   update: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
   colorThemes: { id: string; name: string }[];
   workspaceDir: string | null;
+  activeWorkspaceDir: string | null;
+  onScopeChange: (scope: "global" | "workspace") => void;
 };
 
 type SettingRowProps = { label: string; description?: string; children: ReactNode };
@@ -34,7 +36,7 @@ function Toggle({ label, description, value, onChange }: {
   </SettingRow>;
 }
 
-export default function SettingsPage({ settings, update, colorThemes, workspaceDir }: Props) {
+export default function SettingsPage({ settings, update, colorThemes, workspaceDir, activeWorkspaceDir, onScopeChange }: Props) {
   const [confirmReset, setConfirmReset] = useState(false);
 
   const reset = () => {
@@ -49,9 +51,17 @@ export default function SettingsPage({ settings, update, colorThemes, workspaceD
       <div className="settings-heading">
         <div>
           <div className="search-title">SETTINGS</div>
-          <p>{workspaceDir ? `Settings for ${workspaceDir}. Saved locally for this workspace.` : "Global settings. Open a workspace to customize it independently."}</p>
+          <p>{workspaceDir ? `Changes apply to ${workspaceDir}.` : "Changes apply globally, across all workspaces."}</p>
         </div>
         <button className="settings-reset" onClick={() => setConfirmReset(true)}>Reset defaults</button>
+      </div>
+
+      <div className="settings-scope-row">
+        <label htmlFor="settings-scope">Settings scope</label>
+        <select id="settings-scope" value={workspaceDir ? "workspace" : "global"} onChange={(event) => onScopeChange(event.target.value as "global" | "workspace")}>
+          <option value="global">Global settings</option>
+          <option value="workspace" disabled={!activeWorkspaceDir}>Current workspace</option>
+        </select>
       </div>
 
       <div className="settings-content">

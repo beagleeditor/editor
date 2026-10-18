@@ -32,6 +32,9 @@ type Props = {
   reloadExtensions: () => Promise<void>; setExtensionStatus: Dispatch<SetStateAction<string>>;
   installingExtension: boolean; setInstallingExtension: Dispatch<SetStateAction<boolean>>;
   settings: ReturnType<typeof useSettings>["settings"]; update: ReturnType<typeof useSettings>["update"];
+  settingsPageSettings: ReturnType<typeof useSettings>["settings"];
+  updateSettingsPage: ReturnType<typeof useSettings>["update"];
+  settingsScope: "global" | "workspace"; onSettingsScopeChange: (scope: "global" | "workspace") => void;
   availableColorThemes: InstalledExtension[];
 };
 
@@ -41,7 +44,7 @@ export default function WorkspaceSidebar(props: Props) {
     reloadWorkspace, createItem, setRenameError, setRenameTarget, setRenamePath, setDeleteError,
     setDeleteTarget, workspaceDir, activeFile, extensions, extensionStatus, extensionsDirectory, enabledExtensions,
     setEnabledExtensions, reloadExtensions, setExtensionStatus, installingExtension,
-    setInstallingExtension, settings, update, availableColorThemes } = props;
+    setInstallingExtension, settings, update, settingsPageSettings, updateSettingsPage, settingsScope, onSettingsScopeChange, availableColorThemes } = props;
   return (
     <>
           <ActivityBar
@@ -162,10 +165,12 @@ export default function WorkspaceSidebar(props: Props) {
 
                 {sidebarView === "settings" && (
                   <SettingsPage
-                    settings={settings}
-                    update={update}
+                    settings={settingsPageSettings}
+                    update={updateSettingsPage}
                     colorThemes={availableColorThemes.map((extension) => ({ id: extension.manifest.id, name: extension.manifest.name }))}
-                    workspaceDir={workspaceDir}
+                    workspaceDir={settingsScope === "workspace" ? workspaceDir : null}
+                    activeWorkspaceDir={workspaceDir}
+                    onScopeChange={onSettingsScopeChange}
                   />
                 )}
               </div>

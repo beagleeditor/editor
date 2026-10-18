@@ -45,6 +45,9 @@ export function useWorkspacePreferences(
     () => ({ ...globalSettings, ...current?.settings }),
     [globalSettings, current?.settings],
   ) as Settings;
+  const getSettingsForWorkspace = useCallback((path: string | null) => {
+    return path ? { ...globalSettings, ...preferences[path]?.settings } as Settings : globalSettings;
+  }, [globalSettings, preferences]);
   const enabledExtensions = useMemo(
     () => ({ ...globalEnabledExtensions, ...current?.enabledExtensions }),
     [globalEnabledExtensions, current?.enabledExtensions],
@@ -58,6 +61,14 @@ export function useWorkspacePreferences(
     persist(workspaceDir, (current) => ({ ...current, settings: { ...current.settings, [key]: value } }));
   }, [workspaceDir, persist, updateGlobalSetting]);
 
+  const updateSettingForWorkspace = useCallback(<K extends keyof Settings>(path: string | null, key: K, value: Settings[K]) => {
+    if (!path) {
+      updateGlobalSetting(key, value);
+      return;
+    }
+    persist(path, (previous) => ({ ...previous, settings: { ...previous.settings, [key]: value } }));
+  }, [persist, updateGlobalSetting]);
+
   const updateEnabledExtensions = useCallback<Dispatch<SetStateAction<Record<string, boolean>>>>((action) => {
     if (!workspaceDir) {
       updateGlobalEnabledExtensions(action);
@@ -68,5 +79,5 @@ export function useWorkspacePreferences(
     persist(workspaceDir, (current) => ({ ...current, enabledExtensions: nextEnabled }));
   }, [workspaceDir, globalEnabledExtensions, preferences, persist, updateGlobalEnabledExtensions]);
 
-  return { settings, updateSetting, enabledExtensions, updateEnabledExtensions };
+  return { settings, updateSetting, getSettingsForWorkspace, updateSettingForWorkspace, enabledExtensions, updateEnabledExtensions };
 }
